@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useLocation, Link } from 'wouter';
-import { useQuery } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Sidebar,
   SidebarContent,
@@ -13,17 +12,20 @@ import {
   SidebarMenuSubButton,
   SidebarProvider,
   SidebarTrigger,
+  SidebarTriggerClose,
+  useSidebar,
 } from '@/components/ui/sidebar';
-import { Button } from '@/components/ui/button';
-import { Menu, ChevronDown, Home, Settings, FormInput, ListChecks, Palette, Sun, Moon, Loader2, Search, X, Laptop } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { fetchMainMenus, fetchAllMenus } from '@/lib/api';
+import { fetchAllMenus } from '@/lib/api';
 import { Menu as MenuType } from '@/lib/types';
+import { useQuery } from '@tanstack/react-query';
+import { Home, Laptop, Loader2, Menu, Moon, Search, Sun, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Link, useLocation } from 'wouter';
 // import { useTranslation } from 'react-i18next';
-import { cn } from '@/lib/utils';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useScreenSize } from '@/hooks/use-mobile';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { ThemeType, ThemeStyle, themeManager } from '@/lib/theme';
+import { themeManager } from '@/lib/theme';
+import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 
 export function MainSidebar({ children }: { children: React.ReactNode }) {
@@ -32,7 +34,6 @@ export function MainSidebar({ children }: { children: React.ReactNode }) {
   const screenSize = useScreenSize(); // Sử dụng hook để lấy kích thước màn hình hiện tại
   const [showThemeDialog, setShowThemeDialog] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [currentTheme, setCurrentTheme] = useState(themeManager.getTheme());
@@ -55,7 +56,7 @@ export function MainSidebar({ children }: { children: React.ReactNode }) {
     }
   };
   
-  // Fetch all menus from the API để xử lý parent/child relationship
+  // Fetch all menus from the API để xử lý parent/child relationship đa cấp
   // Thêm retry và staleTime để đảm bảo dữ liệu luôn hiển thị sau khi mount
   const { data: menusData, isLoading, error } = useQuery({
     queryKey: ['/api/menus'],
@@ -64,25 +65,37 @@ export function MainSidebar({ children }: { children: React.ReactNode }) {
         // Hiển thị log rõ ràng hơn
         console.log("Fetching menus for sidebar...");
         const response = await fetchAllMenus();
-        const allMenus = response.data.core_core_dynamic_menus || [];
-        console.log("Fetched", allMenus.length, "menus from API");
+        const allMenusFromAPI = response.data.core_core_dynamic_menus || [];
         
-        // Lọc các menu cha (parent_id là null)
-        const parentMenus = allMenus.filter(menu => !menu.parent_id);
-        console.log("Found", parentMenus.length, "parent menus");
+        // Lọc các menu có status là "active"
+        const allMenus = allMenusFromAPI.filter((menu:any) => menu.status === 'active');
+        console.log("Fetched", allMenusFromAPI.length, "menus from API, filtered to", allMenus.length, "active menus");
         
-        // Thêm submenu vào mỗi menu cha
-        const menuWithChildren = parentMenus.map(parentMenu => {
-          // Tìm tất cả các menu con của menu cha hiện tại
-          const childMenus = allMenus.filter(menu => menu.parent_id === parentMenu.id);
-          console.log(`Menu '${parentMenu.name}' has ${childMenus.length} child menus`);
-          return {
-            ...parentMenu,
-            core_dynamic_child_menus: childMenus // Thêm dưới định dạng cũ để tương thích với code hiện tại
-          };
-        });
+        // Hàm đệ quy để xây dựng cây menu nhiều cấp
+        const buildMenuTree = (menuItems: any[], parentId: string | null = null): MenuType[] => {
+          return menuItems
+            .filter(item => item.parent_id === parentId)
+            .map(item => {
+              // Tìm tất cả các menu con
+              const children = buildMenuTree(menuItems, item.id);
+              // Log số lượng menu con
+              if (children.length > 0) {
+                console.log(`Menu '${item.name}' has ${children.length} child menus`);
+              }
+              
+              // Trả về menu với các con đã được xây dựng đệ quy
+              return {
+                ...item,
+                core_dynamic_child_menus: children.length > 0 ? children : undefined
+              };
+            });
+        };
         
-        return menuWithChildren;
+        // Xây dựng cây menu đa cấp từ menu gốc (parent_id = null)
+        const menuTree = buildMenuTree(allMenus);
+        console.log("Found", menuTree.length, "active parent menus");
+        
+        return menuTree;
       } catch (error) {
         console.error("Error fetching menus:", error);
         return [];
@@ -165,19 +178,21 @@ export function MainSidebar({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen={true}>
-      <div className={containerClass}>
+      <div className={containerClass + ' h-screen flex items-start justify-start overflow-auto'}>
         {/* Mobile Sidebar Trigger - Chỉ hiển thị trên mobile */}
-        <div className="fixed z-20 top-4 left-4 lg:hidden">
+        <div className="fixed top-4 left-4 lg:hidden z-[9999] p-[5px]">
           <SidebarTrigger>
-            <Button size="icon" variant="outline" className="shadow-sm hover:bg-primary/10 transition-colors">
-              <Menu className="size-4" />
+            <Button 
+              size="icon" className="shadow-sm hover:bg-primary/10 transition-colors"
+              variant="ghost">
+                <Menu className="h-5 w-5" />
             </Button>
           </SidebarTrigger>
         </div>
 
         {/* Sidebar - Bắt buộc always open trên desktop */}
         <Sidebar 
-          className="z-10 border-r border-sidebar-border bg-sidebar-background text-sidebar-foreground"
+          className="h-screen flex flex-col items-center justify-start overflow-auto z-10 border-r border-sidebar-border bg-sidebar-background text-sidebar-foreground"
           collapsible={isDesktopOrTablet ? 'none' : 'offcanvas'} // none: không thể đóng trên desktop/tablet
         >
           <SidebarHeader className="p-4 border-b">
@@ -199,45 +214,9 @@ export function MainSidebar({ children }: { children: React.ReactNode }) {
                 </p>
               </div>
               {/* Chỉ hiển thị nút đóng trên mobile */}
-              <button 
-                className="ml-auto lg:hidden text-muted-foreground hover:text-sidebar-foreground p-1 rounded-full hover:bg-primary/10" 
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  
-                  try {
-                    // Đóng sidebar theo cách khác
-                    const sidebar = document.querySelector('[data-sidebar-content]');
-                    if (sidebar) {
-                      sidebar.setAttribute('data-sidebar-opened', 'false');
-                      // Cũng remove overlay nếu có
-                      const overlay = document.getElementById('sidebar-overlay');
-                      if (overlay) {
-                        overlay.classList.add('animate-out', 'fade-out-0');
-                        setTimeout(() => {
-                          try {
-                            overlay.remove();
-                          } catch (err) {
-                            console.error('Error removing overlay in X button:', err);
-                          }
-                        }, 200);
-                      }
-                    }
-                  } catch (err) {
-                    console.error('Error closing sidebar with X button:', err);
-                    // Fallback method
-                    try {
-                      const overlay = document.getElementById('sidebar-overlay');
-                      if (overlay) overlay.remove();
-                    } catch (e) {}
-                  }
-                }}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
+              <div className="ml-auto lg:hidden text-muted-foreground hover:text-sidebar-foreground p-1 rounded-full hover:bg-primary/10" >
+                <SidebarTriggerClose/>
+              </div>
             </div>
             
             {/* Thanh tìm kiếm menu */}
@@ -263,7 +242,7 @@ export function MainSidebar({ children }: { children: React.ReactNode }) {
             </div>
           </SidebarHeader>
 
-          <SidebarContent className="px-2 py-4">
+          <SidebarContent className="px-2 py-4 flex-1 overflow-auto none-scroll">
             <SidebarGroup>
               <div className="text-xs font-semibold text-primary mb-2 px-3 flex items-center">
                 <span className="w-1 h-1 bg-primary rounded-full mr-2 inline-block"></span>
@@ -392,7 +371,7 @@ export function MainSidebar({ children }: { children: React.ReactNode }) {
         </Sidebar>
 
         {/* Main Content */}
-        <div className="flex-1 overflow-auto overflow-x-hidden">
+        <div className="h-screen flex-1 overflow-auto">
           {children}
         </div>
       </div>
@@ -524,17 +503,33 @@ export function MainSidebar({ children }: { children: React.ReactNode }) {
 // Chúng ta sẽ không sử dụng useOverlay hook nữa
 // Mà thay vào đó, xử lý trực tiếp trong các sự kiện click
 
-// Dynamic Menu Item Component
-function DynamicMenuItem({ menu }: { menu: MenuType }) {
+// Dynamic Menu Item Component - Hỗ trợ đa cấp thông qua tham số level
+function DynamicMenuItem({ menu, level = 0 }: { menu: MenuType, level?: number }) {
   const [isOpen, setIsOpen] = useState(false);
   const [location] = useLocation();
   const hasChildren = menu.core_dynamic_child_menus && menu.core_dynamic_child_menus.length > 0;
+  const screenSize = useScreenSize(); 
+  const isDesktopOrTablet = screenSize === 'desktop' || screenSize === 'tablet';
+  const {toggleSidebar} = useSidebar()
 
-  // Kiểm tra xem có submenu đang được chọn không
-  const hasActiveChild = menu.core_dynamic_child_menus?.some(
-    subMenu => location === `/submission/${subMenu.workflow_id}` || 
-               location === `/menu/${menu.id}/submenu/${subMenu.id}`
-  );
+  // Kiểm tra xem có submenu đang được chọn không - hỗ trợ đệ quy đa cấp
+  const checkForActiveChild = (items: MenuType[] = []): boolean => {
+    return items.some(item => {
+      // Kiểm tra menu con này có được chọn không
+      const isActive = location === `/submission/${item.workflow_id}` || 
+                      location === `/menu/${item.id}` ||
+                      location === `/menu/${menu.id}/submenu/${item.id}`;
+                      
+      // Nếu menu con này có menu con khác, kiểm tra đệ quy
+      if (item.core_dynamic_child_menus?.length) {
+        return isActive || checkForActiveChild(item.core_dynamic_child_menus);
+      }
+      
+      return isActive;
+    });
+  };
+  
+  const hasActiveChild = checkForActiveChild(menu.core_dynamic_child_menus);
 
   // Tự động mở menu có menu con đang được chọn
   useEffect(() => {
@@ -583,7 +578,10 @@ function DynamicMenuItem({ menu }: { menu: MenuType }) {
       <SidebarMenuItem>
         <SidebarMenuButton
           asChild
-          onClick={handleMobileMenuClick}
+          onClick={()=>{
+            handleMobileMenuClick()
+            toggleSidebar()
+          }}
           className={`transition-all whitespace-normal ${
             isActive ? 'bg-sidebar-accent text-sidebar-primary font-medium' : 'hover:bg-sidebar-accent/50'
           }`}
@@ -596,11 +594,6 @@ function DynamicMenuItem({ menu }: { menu: MenuType }) {
               </svg>
             </div>
             <span className="min-w-0 flex-1 overflow-hidden break-words hyphens-auto leading-tight">{menu.name}</span>
-            {menu.code && (
-              <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-primary/5 text-primary-foreground/70 whitespace-nowrap flex-shrink-0">
-                {menu.code}
-              </span>
-            )}
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -610,7 +603,10 @@ function DynamicMenuItem({ menu }: { menu: MenuType }) {
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          setIsOpen(!isOpen)
+          handleMobileMenuClick()
+        }}
         className={`transition-all whitespace-normal ${
           isOpen || hasActiveChild ? 'bg-sidebar-accent text-sidebar-primary font-medium' : 'hover:bg-sidebar-accent/50'
         }`}
@@ -621,68 +617,14 @@ function DynamicMenuItem({ menu }: { menu: MenuType }) {
           </svg>
         </div>
         <span className="text-sm min-w-0 flex-1 overflow-hidden break-words hyphens-auto leading-tight">{menu.name}</span>
-        {menu.code && (
-          <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-primary/5 text-primary-foreground/70 whitespace-nowrap flex-shrink-0">
-            {menu.code}
-          </span>
-        )}
       </SidebarMenuButton>
 
       {isOpen && menu.core_dynamic_child_menus && (
         <SidebarMenuSub className="animate-in slide-in-from-left-1 duration-200">
-          {menu.core_dynamic_child_menus.map((subMenu) => {
-            let href = "";
-            // Xử lý đặc biệt cho tất cả các submenu
-            if (subMenu.workflow_id) {
-              href = `/submission/${subMenu.workflow_id}?menuId=${subMenu.id}`;
-            } else {
-              href = `/menu/${menu.id}/submenu/${subMenu.id}`;
-            }
-            const isActive = location === href || location.startsWith(`/submission/${subMenu.workflow_id}`);
-            
-            const handleSubmenuClick = (e: React.MouseEvent) => {
-              // Xử lý đã được thực hiện trong component Submission thông qua menuId param
-              console.log(`Navigating to submenu: ${subMenu.name}, ID: ${subMenu.id}, workflowId: ${subMenu.workflow_id}`);
-              
-              // Đóng sidebar trên thiết bị di động sau khi chọn submenu
-              handleMobileMenuClick();
-            };
-            
-            return (
-              <SidebarMenuSubButton
-                key={subMenu.id}
-                asChild
-                className={`pl-8 flex items-center gap-1.5 transition-all text-sm w-full ${
-                  isActive ? 'bg-sidebar-accent text-sidebar-primary font-medium' : 'hover:bg-sidebar-accent/50'
-                }`}
-                onClick={handleSubmenuClick}
-              >
-                <Link href={href} className="py-1.5 w-full flex items-start">
-                  <div className="flex items-center w-full">
-                    <div className="flex-shrink-0 mr-1">
-                      {subMenu.workflow_id ? (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-                          <circle cx="9" cy="7" r="4"></circle>
-                          <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
-                          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                        </svg>
-                      ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M2 9V5c0-1.1.9-2 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1"></path>
-                          <path d="M2 13h10"></path>
-                          <path d="m9 16 3-3-3-3"></path>
-                        </svg>
-                      )}
-                    </div>
-                    <div className="flex min-w-0 flex-grow">
-                      <div className="text-sm font-medium overflow-hidden break-words hyphens-auto leading-tight">{subMenu.name}</div>
-                    </div>
-                  </div>
-                </Link>
-              </SidebarMenuSubButton>
-            );
-          })}
+          {menu.core_dynamic_child_menus.map((subMenu: MenuType) => (
+            // Gọi đệ quy DynamicMenuItem cho menu con, tăng cấp độ lên 1
+            <DynamicMenuItem key={subMenu.id} menu={subMenu} level={level + 1} />
+          ))}
         </SidebarMenuSub>
       )}
     </SidebarMenuItem>
