@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'wouter';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
-import { Bell, Search, User, Menu, X } from 'lucide-react';
+import { PwaInstallButton } from '@/components/PwaInstallButton';
+import { Bell, Search, User, Menu, X, LogOut, UserCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { clearAuthTokens } from '@/lib/auth';
 import { themeManager } from '@/lib/theme';
 
 interface MainLayoutProps {
@@ -17,8 +21,15 @@ interface MainLayoutProps {
 export function MainLayout({ children, title }: MainLayoutProps) {
   const isMobile = useIsMobile();
   const { t } = useTranslation();
+  const [, setLocation] = useLocation();
   const [scrolled, setScrolled] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(themeManager.getIsDarkMode());
+  
+  // Xử lý đăng xuất
+  const handleLogout = () => {
+    clearAuthTokens();
+    setLocation('/login');
+  };
   
   // Theo dõi cuộn trang để thêm shadow cho header
   useEffect(() => {
@@ -51,35 +62,22 @@ export function MainLayout({ children, title }: MainLayoutProps) {
             : 'bg-background border-b'
         }`}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+        <div className="w-full flex px-4 sm:px-6 lg:px-4">
+          <div className="flex-1 flex justify-between items-center h-16">
             <div className="flex items-center gap-x-3">
               {/* Nút menu cho mobile, chỉ hiện trên trang chủ */}
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="md:hidden mr-1" 
-                onClick={() => {
-                  const triggerButton = document.querySelector('[data-sidebar-trigger]');
-                  if (triggerButton) {
-                    (triggerButton as HTMLButtonElement).click();
-                  }
-                }}
+                className="block md:hidden mr-1 bg-transparent border-none outline-none hover:bg-transparent" 
+                disabled
               >
-                <Menu className="h-5 w-5" />
               </Button>
-              
-              <div className="flex items-center">
-                <span className="h-8 w-8 inline-flex items-center justify-center bg-primary text-primary-foreground text-lg font-bold rounded">
-                  D
-                </span>
-                <span className="ml-2 text-lg font-semibold text-foreground hidden md:inline">DynamicForm</span>
-              </div>
               
               {title && (
                 <div className="flex items-center">
-                  <div className="hidden md:block h-6 w-px bg-border mx-3" />
-                  <h1 className={`${isMobile ? 'text-sm' : 'text-lg'} font-semibold text-foreground truncate max-w-[180px] md:max-w-none`}>
+                  {/* <div className="hidden md:block h-6 w-px bg-border mx-3" /> */}
+                  <h1 className={`${isMobile ? 'text-sm' : 'text-xl'} font-semibold text-foreground truncate max-w-[180px] md:max-w-none`}>
                     {title}
                   </h1>
                 </div>
@@ -105,15 +103,46 @@ export function MainLayout({ children, title }: MainLayoutProps) {
                 </Badge>
               </Button>
               
+              <PwaInstallButton />
               <LanguageSwitcher />
               <ThemeSwitcher />
               
               <div className="h-8 w-px bg-border mx-1 hidden md:block" />
               
-              <Avatar className="h-8 w-8 border">
-                <AvatarImage src="" />
-                <AvatarFallback className="bg-primary/10 text-primary font-medium">VN</AvatarFallback>
-              </Avatar>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" className="h-8 w-8 p-0">
+                    <Avatar className="h-8 w-8 border cursor-pointer hover:shadow-sm transition-shadow">
+                      <AvatarImage src="" />
+                      <AvatarFallback className="bg-primary/10 text-primary font-medium">VN</AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-0" align="end">
+                  <div className="p-3 border-b">
+                    <div className="font-medium">Người dùng</div>
+                    <div className="text-xs text-muted-foreground">user@example.com</div>
+                  </div>
+                  <div className="p-1">
+                    {/* <Button 
+                      variant="ghost" 
+                      className="w-full justify-start font-normal px-2 py-1.5 h-9"
+                      onClick={() => setLocation('/profile')}
+                    >
+                      <UserCircle className="mr-2 h-4 w-4" />
+                      {t('actions.viewProfile', 'Xem hồ sơ')}
+                    </Button> */}
+                    <Button 
+                      variant="ghost" 
+                      className="w-full justify-start font-normal px-2 py-1.5 h-9 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={handleLogout}
+                    >
+                      <LogOut className="mr-2 h-4 w-4" />
+                      {t('actions.logout', 'Đăng xuất')}
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
         </div>
@@ -133,7 +162,7 @@ export function MainLayout({ children, title }: MainLayoutProps) {
         </div>
       </main>
       
-      <footer className="mt-auto py-4 border-t bg-muted/30">
+      {/* <footer className="mt-auto py-4 border-t bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-center text-sm text-muted-foreground">
             <p>
@@ -146,7 +175,7 @@ export function MainLayout({ children, title }: MainLayoutProps) {
             </div>
           </div>
         </div>
-      </footer>
+      </footer> */}
     </div>
   );
 }

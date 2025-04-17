@@ -8,15 +8,15 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
+import { Search, PlusCircle } from 'lucide-react';
 import { SubmissionDataTable } from '@/components/SubmissionDataTable';
-import { AddSubmissionDialog } from '@/components/AddSubmissionDialog';
-import { useParams, useLocation } from 'wouter';
+import { useParams, useLocation, Link } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchMenuRecords, fetchAllMenus, submitFormData } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 
 import { useTranslation } from 'react-i18next';
+import { MainLayout } from '@/components/MainLayout';
 
 // Dữ liệu mẫu các bản ghi phê duyệt
 const sampleSubmissions = [
@@ -115,30 +115,46 @@ export default function WorkflowPage() {
     }
   };
 
+  const [isNavigating, setIsNavigating] = useState(false);
+
+  // Handler cho nút tạo biểu mẫu mới
+  const handleCreateSubmission = () => {
+    setIsNavigating(true);
+    window.location.href = `/submission/${workflowId}/create`;
+  };
+
   return (
-    <div className="container py-6">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <MainLayout title={t('submission.createTitle', currentSubmenu?.name || "Phê duyệt tài chính")}>
+      <div className="w-full px-5 py-6">
+      <Card className="w-full border-none shadow-none">
+        <CardHeader className="flex flex-row items-center justify-between pb-2 px-6">
           <div>
-            <CardTitle>{currentSubmenu?.name || "Phê duyệt tài chính"}</CardTitle>
+            <CardTitle className="text-xl">{currentSubmenu?.name || "Phê duyệt tài chính"}</CardTitle>
             <CardDescription>
               Danh sách các biểu mẫu đã được gửi qua workflow này
             </CardDescription>
           </div>
           {workflowId && (
-            <AddSubmissionDialog onSubmit={handleSubmitForm} workflowId={workflowId} />
+            <Link href={`/submission/${workflowId}/create?menuId=${subMenuId}`}>
+              <Button 
+                className="gap-1 bg-primary hover:bg-primary/90 transition-colors"
+              >
+                <PlusCircle className="h-4 w-4" />
+                <span>{t('submission.create', 'Tạo biểu mẫu')}</span>
+              </Button>
+            </Link>
           )}
         </CardHeader>
         
-        <CardContent>
-          <div className="mb-4">
+        <CardContent className="px-4 py-4">
+          {/* <div className="mb-4">
             <h3 className="text-lg font-medium mb-2">Dữ liệu đã nộp</h3>
             <div className="relative w-full max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="text"
                 placeholder="Tìm kiếm trong dữ liệu..."
-                className="w-full pl-9 pr-4 py-2 border rounded-md"
+                className="w-full pl-9 pr-4 py-2"
               />
             </div>
           </div>
@@ -153,7 +169,7 @@ export default function WorkflowPage() {
             <Button variant="outline" className="text-xs bg-background hover:bg-primary/5 transition-colors text-foreground">
               Số tiền cần chi
             </Button>
-          </div>
+          </div> */}
           
           {/* Sử dụng SubmissionDataTable để hiển thị dữ liệu */}
           <SubmissionDataTable
@@ -165,6 +181,7 @@ export default function WorkflowPage() {
           />
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </MainLayout>
   );
 }

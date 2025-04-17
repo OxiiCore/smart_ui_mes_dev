@@ -141,18 +141,33 @@ export function WorkflowDiagram({
       if (transition.from_status_id && transition.to_status_id) {
         const fromId = transition.from_status_id.replace(/-/g, '_');
         const toId = transition.to_status_id.replace(/-/g, '_');
-        mermaidCode += `  ${fromId} --> ${toId}\n`;
-        // Thêm nhãn riêng
-        // Không thêm linkStyle nữa vì gây lỗi cú pháp
+        // Thêm nhãn hành động từ trường name của transition
+        const transitionName = transition.name || '';
+        if (transitionName) {
+          // Hiển thị tên hành động trực tiếp trên mũi tên
+          mermaidCode += `  ${fromId} -->|${transitionName}| ${toId}\n`;
+        } else {
+          mermaidCode += `  ${fromId} --> ${toId}\n`;
+        }
       } else if (!transition.from_status_id && transition.to_status_id) {
         // Trường hợp bắt đầu (không có trạng thái nguồn)
         const toId = transition.to_status_id.replace(/-/g, '_');
-        mermaidCode += `  Start((Bắt đầu)) --> ${toId}\n`;
+        const transitionName = transition.name || '';
+        if (transitionName) {
+          mermaidCode += `  Start((Bắt đầu)) -->|${transitionName}| ${toId}\n`;
+        } else {
+          mermaidCode += `  Start((Bắt đầu)) --> ${toId}\n`;
+        }
         mermaidCode += `  style Start fill:#00B1D2,stroke:#1c80cf,stroke-width:2px,color:white\n`;
       } else if (transition.from_status_id && !transition.to_status_id) {
         // Trường hợp kết thúc (không có trạng thái đích)
         const fromId = transition.from_status_id.replace(/-/g, '_');
-        mermaidCode += `  ${fromId} --> End((Kết thúc))\n`;
+        const transitionName = transition.name || '';
+        if (transitionName) {
+          mermaidCode += `  ${fromId} -->|${transitionName}| End((Kết thúc))\n`;
+        } else {
+          mermaidCode += `  ${fromId} --> End((Kết thúc))\n`;
+        }
         mermaidCode += `  style End fill:#00B1D2,stroke:#1c80cf,stroke-width:2px,color:white\n`;
       }
     });
@@ -193,7 +208,7 @@ export function WorkflowDiagram({
   if (useDialogStyle) {
     return (
       <Dialog open onOpenChange={onClose}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="dialog-content max-w-3xl bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 border-slate-200 shadow-xl">
           <DialogHeader>
             <DialogTitle>
               <div className="flex justify-between items-center">
