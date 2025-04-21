@@ -16,6 +16,10 @@ export function CameraPermission() {
     if (permissionState === 'prompt') {
       setOpen(true);
     }
+    // Nếu trạng thái là prompt, hiển thị hộp thoại
+    if (permissionState !== 'prompt') {
+      setOpen(false);
+    }
   }, [permissionState]);
 
   const handleRequestPermission = async () => {

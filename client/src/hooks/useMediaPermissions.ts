@@ -91,6 +91,6 @@ export function useMediaPermissions(type: PermissionType): UseMediaPermissionsRe
   return {
     status,
     isGranted: status === 'granted',
-    requestPermission,
+    requestPermission
   };
 }
