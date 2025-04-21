@@ -7,3 +7,4 @@ vite.config.ts.*
 .replit
 .secrets
 soffice-prod.json
+.docker-compose.yml
