@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Measure from "react-measure";
 import { useUserMedia } from "../../hooks/useUserMedia";
 import { useCardRatio } from "../../hooks/useCardRatio";
@@ -18,9 +18,16 @@ const CAPTURE_OPTIONS = {
   video: { facingMode: "environment" }
 };
 
-export function Camera({ onCapture, onClear }) {
-  const canvasRef = useRef<any>();
-  const videoRef = useRef<any>();
+interface CameraProps {
+  onCapture: (blob: Blob) => void;
+  onClear: () => void;
+  onConfirm: (confirmed: boolean) => void;
+  currentImage?: string;
+}
+
+export function Camera({ onCapture, onClear, onConfirm, currentImage }: CameraProps) {
+  const canvasRef = useRef<any>(null);
+  const videoRef = useRef<any>(null);
 
   const [container, setContainer] = useState({ width: 0, height: 0 });
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
@@ -35,6 +42,27 @@ export function Camera({ onCapture, onClear }) {
     container.width,
     container.height
   );
+
+  // Update canvas with currentImage when provided
+  useEffect(() => {
+    if (currentImage && canvasRef.current) {
+      const context = canvasRef.current.getContext("2d");
+      if (context) {
+        const img = new Image();
+        img.onload = () => {
+          context.drawImage(
+            img,
+            0,
+            0,
+            container.width,
+            container.height
+          );
+          setIsCanvasEmpty(false);
+        };
+        img.src = currentImage;
+      }
+    }
+  }, [currentImage, container.width, container.height]);
 
   if (mediaStream && videoRef.current && !videoRef.current.srcObject) {
     videoRef.current.srcObject = mediaStream;
@@ -55,32 +83,41 @@ export function Camera({ onCapture, onClear }) {
 
   function handleCapture() {
     const context = canvasRef.current.getContext("2d");
+    if (!context || !videoRef.current) return;
 
     context.drawImage(
       videoRef.current,
       offsets.x,
       offsets.y,
-      container.width,
-      container.height,
+      videoRef.current.videoWidth,
+      videoRef.current.videoHeight,
       0,
       0,
-      container.width,
-      container.height
+      videoRef.current.videoWidth,
+      videoRef.current.videoHeight,
     );
-    console.log(
-      canvasRef.current.toDataURL("image/png")
-      // .replace(/^data:image\/(png|jpg);base64,/, "")
-    );
-    canvasRef.current.toBlob((blob: any) => onCapture(blob), "image/jpeg", 1);
+    
+    canvasRef.current.toBlob((blob: Blob | null) => {
+      if (blob) {
+        onCapture(blob);
+      }
+    }, "image/jpeg", 1);
+    
     setIsCanvasEmpty(false);
     setIsFlashing(true);
   }
 
   function handleClear() {
     const context = canvasRef.current.getContext("2d");
+    if (!context || !canvasRef.current) return;
+    
     context.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     setIsCanvasEmpty(true);
     onClear();
+  }
+
+  function handleConfirm() {
+    onConfirm(true);
   }
 
   if (!mediaStream) {
@@ -93,8 +130,6 @@ export function Camera({ onCapture, onClear }) {
         <Wrapper>
           <Container
             ref={measureRef}
-            maxHeight={videoRef.current && videoRef.current.videoHeight}
-            maxWidth={videoRef.current && videoRef.current.videoWidth}
             style={{
               height: `${container.height}px`
             }}
@@ -112,22 +147,29 @@ export function Camera({ onCapture, onClear }) {
 
             <Canvas
               ref={canvasRef}
-              width={container.width}
-              height={container.height}
+              width={videoRef.current.videoWidth}
+              height={videoRef.current.videoHeight}
             />
 
-            {/* <Flash
+            <Flash
               flash={isFlashing}
               onAnimationEnd={() => setIsFlashing(false)}
-            /> */}
+            />
           </Container>
 
           {isVideoPlaying && (
-            <Button onClick={isCanvasEmpty ? handleCapture : handleClear}
-              className="w-full mt-4"
-            >
-              {isCanvasEmpty ? "Chụp ảnh" : "Chụp lại"}
-            </Button>
+            <div className="flex justify-center items-center">
+              {!isCanvasEmpty && (
+                <Button onClick={handleConfirm}>
+                  Xác nhận
+                </Button>
+              )}
+              <Button onClick={isCanvasEmpty ? handleCapture : handleClear}
+                className="w-full mt-4"
+              >
+                {isCanvasEmpty ? "Chụp ảnh" : "Chụp lại"}
+              </Button>
+            </div>
           )}
         </Wrapper>
       )}

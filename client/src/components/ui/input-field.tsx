@@ -1388,7 +1388,11 @@ export function InputField({
             // Access the camera
             if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
               navigator.mediaDevices.getUserMedia({ 
-                video: true 
+                video: {
+                  width: { ideal: 1280 },
+                  height: { ideal: 720 },
+                  facingMode: 'user', // 'environment' for back camera on mobile
+                } 
               })
               .then(stream => {
                 if (videoRef.current) {
@@ -1471,6 +1475,11 @@ export function InputField({
                 <Camera
                   onCapture={(blob: any) => setCardImage(blob)}
                   onClear={() => setCardImage(undefined)}
+                  onConfirm={(value: boolean) => {
+                    if (value) {
+                      setIsModalOpen(false);
+                    }
+                  }}
                 />
                 {/* <div className="w-full max-w-sm border-2 border-blue-200 rounded-md overflow-hidden bg-black relative"> */}
                   {/* {photoCapture.previewUrl ? (
