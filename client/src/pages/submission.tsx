@@ -1,15 +1,13 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useParams } from 'wouter';
-import { MainLayout } from '@/components/MainLayout';
-import { fetchMenuRecords, updateSubmissionForm, submitFormData, fetchAllMenus, fetchMenuViewForm } from '@/lib/api';
-import { SubmissionForm, FormSubmission, Menu } from '@/lib/types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useTranslation } from 'react-i18next';
-import { SubmissionDataTable } from '@/components/SubmissionDataTable';
 import { AddSubmissionDialog } from '@/components/AddSubmissionDialog';
+import { SubmissionDataTable } from '@/components/SubmissionDataTable';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { fetchAllMenus, fetchMenuRecords, fetchMenuViewForm, submitFormData, updateSubmissionForm } from '@/lib/api';
+import { FormSubmission, Menu } from '@/lib/types';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+import { useParams } from 'wouter';
 
 export default function SubmissionPage() {
   const { t } = useTranslation();
@@ -260,7 +258,7 @@ export default function SubmissionPage() {
   return (
     <div className="h-full">
       <Card className="overflow-hidden w-full border-0 rounded-none h-full flex flex-col">
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between space-y-2 sm:space-y-0 pb-2 px-6">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between space-y-2 sm:space-y-0 pb-2 px-4">
           <div>
             <CardTitle className="text-xl sm:text-2xl">{title}</CardTitle>
             <CardDescription>
@@ -272,7 +270,7 @@ export default function SubmissionPage() {
             workflowId={workflowId}
           />
         </CardHeader>
-        <CardContent className="p-0 flex-1 overflow-auto">
+        <CardContent className="flex-1 overflow-auto">
           {data.length === 0 ? (
             <div className="p-4 sm:p-8 text-center">
               <p className="text-muted-foreground">{t('submission.noData', 'Chưa có dữ liệu nào được gửi qua workflow này')}</p>

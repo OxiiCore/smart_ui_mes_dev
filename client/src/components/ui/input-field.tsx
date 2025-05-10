@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Camera } from '@/components/camera/camera';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
 import jsQR from 'jsqr';
@@ -25,7 +26,8 @@ import {
   DatabaseIcon,
   ChevronDownIcon,
   UploadIcon,
-  SaveIcon
+  SaveIcon,
+  
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -38,6 +40,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { fieldTypeColors, FieldType, FieldOption } from '@/lib/types';
+import { CameraPermission } from '../CameraPermission';
 interface InputFieldProps {
   id: string;
   name: string;
@@ -96,13 +99,9 @@ export function InputField({
   };
 
   // Default options if none provided
-  const fieldOptions = options.length > 0 
+  const fieldOptions = options?.length > 0 
     ? options 
-    : Array(4).fill(0).map((_, i) => ({ 
-        id: `option-${i+1}`, 
-        label: `Lựa chọn ${i+1}`, 
-        value: `${i+1}`
-      }));
+    : []
 
   const renderField = () => {
     switch (fieldType) {
@@ -112,7 +111,7 @@ export function InputField({
             id={id}
             value={value || ""}
             onChange={handleChange}
-            className={cn(error && "border-red-500")}
+            className={cn(error && "ring-2 ring-red-500" && "border border-gray-200")}
             placeholder="Nhập văn bản"
             required={required}
           />
@@ -124,7 +123,7 @@ export function InputField({
             id={id}
             value={value || ""}
             onChange={handleChange}
-            className={cn(error && "border-red-500")}
+            className={cn(error && "ring-2 ring-red-500")}
             placeholder="Nhập đoạn văn bản dài"
             rows={3}
             required={required}
@@ -138,7 +137,7 @@ export function InputField({
             type="number"
             value={value || ""}
             onChange={handleChange}
-            className={cn(error && "border-red-500")}
+            className={cn(error && "ring-2 ring-red-500")}
             placeholder="0"
             required={required}
           />
@@ -153,7 +152,7 @@ export function InputField({
           >
             {fieldOptions.map((option) => (
               <div 
-                key={option.id} 
+                key={`${option.label}-${option.value}`} 
                 className={cn(
                   "flex items-center space-x-2",
                   error && "border-red-500 p-2 rounded"
@@ -171,14 +170,14 @@ export function InputField({
           <div className="mt-2 space-y-2">
             {fieldOptions.map((option) => (
               <div 
-                key={option.id} 
+                key={`${option.label}-${option.value}`} 
                 className={cn(
                   "flex items-center space-x-2",
                   error && "border-red-500 p-2 rounded"
                 )}
               >
                 <Checkbox
-                  id={`${id}-${option.id}`}
+                  id={`${id}-${option.label}-${option.value}`}
                   checked={(value || []).includes(option.value)}
                   onCheckedChange={(checked) => {
                     const currentValues = Array.isArray(value) ? value : [];
@@ -203,16 +202,19 @@ export function InputField({
               <Button
                 variant="outline"
                 className={cn(
-                  "w-full justify-start text-left font-normal",
-                  !value && "text-muted-foreground",
-                  error && "border-red-500"
+                  "w-full justify-start text-left font-normal h-10 rounded-md",
+                  "bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100",
+                  "border border-slate-300 dark:border-slate-700",
+                  "focus-visible:ring-1 focus-visible:ring-slate-500",
+                  !value && "text-slate-400",
+                  error && "border-red-500 ring-2 ring-red-500"
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
                 {value ? format(new Date(value), "PPP", { locale: vi }) : "Chọn một ngày"}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0">
+            <PopoverContent className="w-auto p-0 z-50">
               <Calendar
                 mode="single"
                 selected={value ? new Date(value) : undefined}
@@ -230,7 +232,7 @@ export function InputField({
             id={id}
             value={value || ""}
             onChange={handleChange}
-            className={cn(error && "border-red-500")}
+            className={cn(error && "ring-2 ring-red-500")}
             placeholder="Nhập dữ liệu đầu vào"
             required={required}
           />
@@ -287,7 +289,7 @@ export function InputField({
                 value={value?.value || ""}
                 onChange={handleCacheChange}
                 className={cn(
-                  error && "border-red-500",
+                  error && "ring-2 ring-red-500",
                   "pr-10"
                 )}
                 placeholder="Dữ liệu sẽ được lưu cache"
@@ -1386,10 +1388,10 @@ export function InputField({
             // Access the camera
             if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
               navigator.mediaDevices.getUserMedia({ 
-                video: { 
-                  facingMode: 'environment', // Prefer back camera
+                video: {
                   width: { ideal: 1280 },
-                  height: { ideal: 720 } 
+                  height: { ideal: 720 },
+                  facingMode: 'user', // 'environment' for back camera on mobile
                 } 
               })
               .then(stream => {
@@ -1459,15 +1461,28 @@ export function InputField({
           }
         };
 
+        const [cardImage, setCardImage] = useState();
+        
         return (
-          <Button 
-            variant="outline"
-            className="w-full py-6"
-            type="button"
-            onClick={() => openModal("Chụp ảnh", (
+          <>
+            <CameraPermission />
+            <Button 
+              variant="outline"
+              className="w-full py-6"
+              type="button"
+              onClick={() => openModal("Chụp ảnh", (
               <div className="flex flex-col items-center gap-5 py-4">
-                <div className="w-full max-w-sm border-2 border-blue-200 rounded-md overflow-hidden bg-black relative">
-                  {photoCapture.previewUrl ? (
+                <Camera
+                  onCapture={(blob: any) => setCardImage(blob)}
+                  onClear={() => setCardImage(undefined)}
+                  onConfirm={(value: boolean) => {
+                    if (value) {
+                      setIsModalOpen(false);
+                    }
+                  }}
+                />
+                {/* <div className="w-full max-w-sm border-2 border-blue-200 rounded-md overflow-hidden bg-black relative"> */}
+                  {/* {photoCapture.previewUrl ? (
                     <img 
                       src={photoCapture.previewUrl} 
                       alt="Preview" 
@@ -1481,20 +1496,20 @@ export function InputField({
                       muted 
                       className="w-full h-auto"
                     />
-                  )}
+                  )} */}
                   
                   {/* Camera overlay elements */}
-                  {!photoCapture.previewUrl && (
+                  {/* {!photoCapture.previewUrl && (
                     <div className="absolute inset-0 pointer-events-none">
                       <div className="absolute top-0 left-0 w-full h-0.5 bg-blue-500 opacity-50"></div>
                       <div className="absolute top-0 right-0 h-full w-0.5 bg-blue-500 opacity-50"></div>
                       <div className="absolute bottom-0 right-0 w-full h-0.5 bg-blue-500 opacity-50"></div>
                       <div className="absolute top-0 left-0 h-full w-0.5 bg-blue-500 opacity-50"></div>
                     </div>
-                  )}
-                </div>
+                  )} */}
+                {/* </div> */}
                 
-                <div className="flex gap-2 w-full">
+                {/* <div className="flex gap-2 w-full">
                   {photoCapture.previewUrl ? (
                     <>
                       <Button
@@ -1539,24 +1554,23 @@ export function InputField({
                       Chụp ảnh
                     </Button>
                   )}
-                </div>
+                </div> */}
               </div>
             ))}
           >
             <CameraIcon className="h-6 w-6 mr-2 text-blue-600" />
-            {value ? (
+            {cardImage ? (
               <div className="flex items-center">
                 <span className="mr-2">Ảnh đã chụp</span>
-                {typeof value === 'object' && value?.url && (
                   <div className="h-6 w-6 rounded-full overflow-hidden">
-                    <img src={value.url} alt="Thumbnail" className="h-full w-full object-cover" />
+                    <img src={URL.createObjectURL(cardImage)} alt="Thumbnail" className="h-full w-full object-cover" />
                   </div>
-                )}
               </div>
             ) : (
               "Nhấn để chụp ảnh"
             )}
-          </Button>
+            </Button>
+          </>
         );
       
       default:
@@ -1568,7 +1582,7 @@ export function InputField({
 
   return (
     <>
-      <div className="mb-6 p-4 border border-gray-200 rounded-lg hover:border-primary-300 transition-colors">
+      <div className="transition-colors">
         <div className="flex items-start justify-between mb-2">
           <div>
             {fieldType !== "SINGLE_CHOICE" && fieldType !== "MULTI_CHOICE" && (

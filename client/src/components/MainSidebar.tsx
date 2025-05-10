@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useLocation, Link } from 'wouter';
-import { useQuery } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Sidebar,
   SidebarContent,
@@ -13,17 +12,44 @@ import {
   SidebarMenuSubButton,
   SidebarProvider,
   SidebarTrigger,
+  SidebarTriggerClose,
+  useSidebar,
 } from '@/components/ui/sidebar';
-import { Button } from '@/components/ui/button';
-import { Menu, ChevronDown, Home, Settings, FormInput, ListChecks, Palette, Sun, Moon, Loader2, Search, X, Laptop } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { fetchMainMenus, fetchAllMenus } from '@/lib/api';
+import { fetchAllMenus } from '@/lib/api';
 import { Menu as MenuType } from '@/lib/types';
+import { useQuery } from '@tanstack/react-query';
+import { 
+  Archive,
+  Box,
+  Calendar,
+  CheckCircle,
+  ChevronDown,
+  ChevronRight,
+  Clipboard,
+  FileText, 
+  Home, 
+  Laptop,
+  Layers,
+  Loader2, 
+  Menu, 
+  Moon, 
+  Package,
+  Search, 
+  Settings, 
+  Shield,
+  Sun, 
+  LayoutGrid,
+  X 
+} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Link, useLocation } from 'wouter';
 // import { useTranslation } from 'react-i18next';
-import { cn } from '@/lib/utils';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useScreenSize } from '@/hooks/use-mobile';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { ThemeType, ThemeStyle, themeManager } from '@/lib/theme';
+import { themeManager, ThemeType, ThemeStyle } from '@/lib/theme';
+import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 
 export function MainSidebar({ children }: { children: React.ReactNode }) {
@@ -32,7 +58,6 @@ export function MainSidebar({ children }: { children: React.ReactNode }) {
   const screenSize = useScreenSize(); // Sử dụng hook để lấy kích thước màn hình hiện tại
   const [showThemeDialog, setShowThemeDialog] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [currentTheme, setCurrentTheme] = useState(themeManager.getTheme());
@@ -55,7 +80,7 @@ export function MainSidebar({ children }: { children: React.ReactNode }) {
     }
   };
   
-  // Fetch all menus from the API để xử lý parent/child relationship
+  // Fetch all menus from the API để xử lý parent/child relationship đa cấp
   // Thêm retry và staleTime để đảm bảo dữ liệu luôn hiển thị sau khi mount
   const { data: menusData, isLoading, error } = useQuery({
     queryKey: ['/api/menus'],
@@ -64,25 +89,37 @@ export function MainSidebar({ children }: { children: React.ReactNode }) {
         // Hiển thị log rõ ràng hơn
         console.log("Fetching menus for sidebar...");
         const response = await fetchAllMenus();
-        const allMenus = response.data.core_core_dynamic_menus || [];
-        console.log("Fetched", allMenus.length, "menus from API");
+        const allMenusFromAPI = response.data.core_core_dynamic_menus || [];
         
-        // Lọc các menu cha (parent_id là null)
-        const parentMenus = allMenus.filter(menu => !menu.parent_id);
-        console.log("Found", parentMenus.length, "parent menus");
+        // Lọc các menu có status là "active"
+        const allMenus = allMenusFromAPI.filter((menu:any) => menu.status === 'active');
+        console.log("Fetched", allMenusFromAPI.length, "menus from API, filtered to", allMenus.length, "active menus");
         
-        // Thêm submenu vào mỗi menu cha
-        const menuWithChildren = parentMenus.map(parentMenu => {
-          // Tìm tất cả các menu con của menu cha hiện tại
-          const childMenus = allMenus.filter(menu => menu.parent_id === parentMenu.id);
-          console.log(`Menu '${parentMenu.name}' has ${childMenus.length} child menus`);
-          return {
-            ...parentMenu,
-            core_dynamic_child_menus: childMenus // Thêm dưới định dạng cũ để tương thích với code hiện tại
-          };
-        });
+        // Hàm đệ quy để xây dựng cây menu nhiều cấp
+        const buildMenuTree = (menuItems: any[], parentId: string | null = null): MenuType[] => {
+          return menuItems
+            .filter(item => item.parent_id === parentId)
+            .map(item => {
+              // Tìm tất cả các menu con
+              const children = buildMenuTree(menuItems, item.id);
+              // Log số lượng menu con
+              if (children.length > 0) {
+                console.log(`Menu '${item.name}' has ${children.length} child menus`);
+              }
+              
+              // Trả về menu với các con đã được xây dựng đệ quy
+              return {
+                ...item,
+                core_dynamic_child_menus: children.length > 0 ? children : undefined
+              };
+            });
+        };
         
-        return menuWithChildren;
+        // Xây dựng cây menu đa cấp từ menu gốc (parent_id = null)
+        const menuTree = buildMenuTree(allMenus);
+        console.log("Found", menuTree.length, "active parent menus");
+        
+        return menuTree;
       } catch (error) {
         console.error("Error fetching menus:", error);
         return [];
@@ -95,6 +132,7 @@ export function MainSidebar({ children }: { children: React.ReactNode }) {
 
   // Lấy cài đặt mặc định cho SidebarProvider dựa trên kích thước màn hình
   const isDesktopOrTablet = screenSize === 'desktop' || screenSize === 'tablet';
+  const isMobile = screenSize === 'mobile';
   const defaultOpen = true; // Luôn mở mặc định (không phụ thuộc kích thước màn hình)
   
   // Sử dụng CSS từ file sidebar-fix.css trong một class
@@ -165,79 +203,50 @@ export function MainSidebar({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen={true}>
-      <div className={containerClass}>
+      <div className={containerClass + ' h-screen flex items-start justify-start overflow-auto'}>
         {/* Mobile Sidebar Trigger - Chỉ hiển thị trên mobile */}
-        <div className="fixed z-20 top-4 left-4 lg:hidden">
+        <div className="fixed top-4 left-4 lg:hidden z-[9999] p-[5px]">
           <SidebarTrigger>
-            <Button size="icon" variant="outline" className="shadow-sm hover:bg-primary/10 transition-colors">
-              <Menu className="size-4" />
+            <Button 
+              size="icon" className="shadow-sm hover:bg-primary/10 transition-colors"
+              variant="ghost">
+                <Menu className="h-5 w-5" />
             </Button>
           </SidebarTrigger>
         </div>
 
-        {/* Sidebar - Bắt buộc always open trên desktop */}
+        {/* Sidebar - Bắt buộc always open trên desktop, dark theme cho cả desktop và mobile */}
         <Sidebar 
-          className="z-10 border-r border-sidebar-border bg-sidebar-background text-sidebar-foreground"
+          className={cn(
+            "h-screen flex flex-col items-center justify-start overflow-auto z-10",
+            "border-r border-slate-700",
+            "bg-slate-900 text-gray-300"
+          )}
           collapsible={isDesktopOrTablet ? 'none' : 'offcanvas'} // none: không thể đóng trên desktop/tablet
         >
-          <SidebarHeader className="p-4 border-b">
+          <SidebarHeader className={cn("p-4 border-b border-slate-700")}>
             <div className="flex items-center">
-              <div className="mr-3 flex items-center justify-center h-9 w-9 rounded-md bg-primary text-primary-foreground">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2" />
-                  <path d="M18 14h-8" />
-                  <path d="M15 18h-5" />
-                  <path d="M10 6h8v4h-8V6Z" />
-                </svg>
+              <div className="mr-3 flex items-center justify-center h-9 w-9 rounded-md bg-transparent">
+                <img src="/icons/app-icon.svg" alt="logo" className="h-10 w-10" />
               </div>
               <div>
-                <h1 className="text-lg font-bold text-sidebar-foreground">
+                <h1 className="text-lg font-bold text-white">
                   {t('app.shortTitle', 'Form Động')}
                 </h1>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-gray-400">
                   {t('app.version', 'v1.0.0')}
                 </p>
               </div>
               {/* Chỉ hiển thị nút đóng trên mobile */}
-              <button 
-                className="ml-auto lg:hidden text-muted-foreground hover:text-sidebar-foreground p-1 rounded-full hover:bg-primary/10" 
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  
-                  try {
-                    // Đóng sidebar theo cách khác
-                    const sidebar = document.querySelector('[data-sidebar-content]');
-                    if (sidebar) {
-                      sidebar.setAttribute('data-sidebar-opened', 'false');
-                      // Cũng remove overlay nếu có
-                      const overlay = document.getElementById('sidebar-overlay');
-                      if (overlay) {
-                        overlay.classList.add('animate-out', 'fade-out-0');
-                        setTimeout(() => {
-                          try {
-                            overlay.remove();
-                          } catch (err) {
-                            console.error('Error removing overlay in X button:', err);
-                          }
-                        }, 200);
-                      }
-                    }
-                  } catch (err) {
-                    console.error('Error closing sidebar with X button:', err);
-                    // Fallback method
-                    try {
-                      const overlay = document.getElementById('sidebar-overlay');
-                      if (overlay) overlay.remove();
-                    } catch (e) {}
-                  }
-                }}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
+              <div className={cn(
+                "ml-auto lg:hidden", 
+                "text-gray-400 hover:text-white", 
+                "p-1.5 rounded-full hover:bg-slate-800"
+              )}>
+                <SidebarTriggerClose>
+                  <X className="h-5 w-5" />
+                </SidebarTriggerClose>
+              </div>
             </div>
             
             {/* Thanh tìm kiếm menu */}
@@ -248,25 +257,38 @@ export function MainSidebar({ children }: { children: React.ReactNode }) {
                   placeholder={t('menu.search', 'Tìm kiếm menu...')}
                   value={searchQuery}
                   onChange={handleSearch}
-                  className="pl-9 pr-8 py-1.5 h-9 text-sm bg-sidebar-accent/20 border-sidebar-border focus-visible:ring-primary oxii-transition"
+                  data-sidebar="input"
+                  className={cn(
+                    "pl-9 pr-8 py-1.5 h-9 text-sm",
+                    "bg-slate-800 border-slate-700 text-gray-300",
+                    "focus-visible:ring-orange-500 transition-colors"
+                  )}
                 />
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className={cn(
+                  "absolute left-2.5 top-1/2 -translate-y-1/2",
+                  "h-4 w-4 text-gray-400"
+                )} />
                 {searchQuery && (
                   <button
                     onClick={clearSearch}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-sidebar-border/60 hover:bg-sidebar-border flex items-center justify-center oxii-transition"
+                    className={cn(
+                      "absolute right-2.5 top-1/2 -translate-y-1/2",
+                      "h-5 w-5 rounded-full",
+                      "bg-slate-700 hover:bg-slate-600",
+                      "flex items-center justify-center transition-colors"
+                    )}
                   >
-                    <X className="h-3 w-3 text-muted-foreground" />
+                    <X className="h-3 w-3 text-gray-300" />
                   </button>
                 )}
               </div>
             </div>
           </SidebarHeader>
 
-          <SidebarContent className="px-2 py-4">
+          <SidebarContent className="px-2 py-4 flex-1 overflow-auto none-scroll">
             <SidebarGroup>
-              <div className="text-xs font-semibold text-primary mb-2 px-3 flex items-center">
-                <span className="w-1 h-1 bg-primary rounded-full mr-2 inline-block"></span>
+              <div className="text-xs uppercase font-semibold text-orange-500 mb-2 px-3 flex items-center">
+                <span className="w-1 h-1 bg-orange-500 rounded-full mr-2 inline-block"></span>
                 {t('app.sidebar.applications', 'Ứng dụng')}
               </div>
               
@@ -308,14 +330,15 @@ export function MainSidebar({ children }: { children: React.ReactNode }) {
                         }, 100);
                       }
                     }}
-                    className={`transition-all whitespace-normal ${
-                      location === '/' ? 'bg-sidebar-accent text-sidebar-primary font-medium' : 'hover:bg-sidebar-accent/50'
-                    }`}
+                    className={cn(
+                      "transition-all whitespace-normal",
+                      location === '/' 
+                        ? "bg-orange-900 text-orange-500 font-medium" 
+                        : "text-gray-400 hover:bg-slate-800 hover:text-white"
+                    )}
                   >
                     <Link href="/" className="w-full flex items-center">
-                      <div className="flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary mr-2 flex-shrink-0">
-                        <Home className="size-3" />
-                      </div>
+                      <Home className="size-4 mr-2 flex-shrink-0" />
                       <span className="min-w-0 flex-1 whitespace-normal overflow-hidden text-ellipsis leading-tight">
                         {t('app.home', 'Trang chủ')}
                       </span>
@@ -324,34 +347,34 @@ export function MainSidebar({ children }: { children: React.ReactNode }) {
                 </SidebarMenuItem>
                 
                 {/* Divider sau trang chủ */}
-                <div className="my-2 border-t border-sidebar-border/30"></div>
+                <div className="my-2 border-t border-slate-800/50"></div>
                 
                 {/* Dynamic Menu Items */}
                 {isLoading ? (
-                  <div className="p-4 text-sm text-muted-foreground flex items-center justify-center">
+                  <div className="p-4 text-sm text-gray-400 flex items-center justify-center">
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     {t('loading.title', 'Đang tải...')}
                   </div>
                 ) : menusData?.length === 0 ? (
-                  <div className="p-4 text-sm text-muted-foreground">{t('menu.noItems', 'Không có menu nào')}</div>
+                  <div className="p-4 text-sm text-gray-400">{t('menu.noItems', 'Không có menu nào')}</div>
                 ) : showSearchResults && searchQuery ? (
                   // Hiển thị kết quả tìm kiếm
                   <>
-                    <div className="text-xs font-medium text-muted-foreground mb-2 px-2 py-1 flex items-center justify-between bg-sidebar-accent/30 rounded">
+                    <div className="text-xs font-medium text-gray-300 mb-2 px-2 py-1 flex items-center justify-between bg-slate-800 rounded">
                       <div className="flex items-center">
                         <Search className="h-3 w-3 mr-1.5" />
                         {t('menu.searchResults', 'Kết quả tìm kiếm')} ({searchResults.length})
                       </div>
                       <button 
                         onClick={clearSearch}
-                        className="text-muted-foreground hover:text-sidebar-foreground"
+                        className="text-gray-400 hover:text-white"
                       >
                         <X className="h-3 w-3" />
                       </button>
                     </div>
                     
                     {searchResults.length === 0 ? (
-                      <div className="p-4 text-sm text-muted-foreground text-center">
+                      <div className="p-4 text-sm text-gray-400 text-center">
                         {t('menu.noSearchResults', 'Không tìm thấy kết quả nào cho "{{query}}"', { query: searchQuery })}
                       </div>
                     ) : (
@@ -362,8 +385,8 @@ export function MainSidebar({ children }: { children: React.ReactNode }) {
                       </div>
                     )}
                     
-                    <div className="my-2 border-t border-sidebar-border/30"></div>
-                    <div className="text-xs text-muted-foreground mb-2 px-2">
+                    <div className="my-2 border-t border-slate-800/50"></div>
+                    <div className="text-xs text-gray-400 mb-2 px-2">
                       {t('menu.allMenus', 'Tất cả các menu')}
                     </div>
                   </>
@@ -377,142 +400,194 @@ export function MainSidebar({ children }: { children: React.ReactNode }) {
             </SidebarGroup>
           </SidebarContent>
 
-          <div className="border-t border-sidebar-border bg-sidebar-accent/20 p-2">
+          <div className={cn(
+            "border-t border-slate-700",
+            "bg-slate-800/50 p-2"
+          )}>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setShowThemeDialog(true)}
-              className="w-full justify-start"
+              className={cn(
+                "w-full justify-start",
+                "text-gray-400 hover:text-white hover:bg-slate-800"
+              )}
             >
-              <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-              <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-              <span className="ml-2">{t('theme.title', 'Giao diện')}</span>
+              <Sun className="h-4 w-4 mr-2" />
+              <span>{t('theme.title', 'Giao diện')}</span>
             </Button>
           </div>
         </Sidebar>
 
         {/* Main Content */}
-        <div className="flex-1 overflow-auto overflow-x-hidden">
+        <div className="h-screen flex-1 overflow-auto">
           {children}
         </div>
       </div>
 
-      {/* Hộp thoại chủ đề */}
+      {/* Hộp thoại thiết lập giao diện */}
       <Dialog open={showThemeDialog} onOpenChange={setShowThemeDialog}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold">
+        <DialogContent className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 border-slate-200 shadow-xl w-full max-w-md">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-xl font-bold text-foreground">
               {t('theme.dialog.title', 'Thiết lập giao diện')}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-muted-foreground">
               {t('theme.dialog.description', 'Tùy chỉnh giao diện theo sở thích của bạn.')}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-2">
-            <div className="space-y-2">
-              <h3 className="text-sm font-medium">{t('theme.mode', 'Chế độ hiển thị')}</h3>
-              <div className="grid grid-cols-3 gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => {
-                    themeManager.setTheme({ theme: 'light' });
-                  }}
+          
+          <div className="space-y-6 py-3">
+            {/* Chế độ hiển thị */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium text-foreground">
+                {t('theme.mode', 'Chế độ hiển thị')}
+              </Label>
+              
+              <RadioGroup 
+                value={currentTheme.theme}
+                className="grid grid-cols-3 gap-3"
+                onValueChange={(value) => themeManager.setTheme({ theme: value as ThemeType })}
+              >
+                <Label
+                  htmlFor="theme-light"
                   className={cn(
-                    "flex flex-col items-center justify-center gap-1 h-auto py-3",
-                    currentTheme.theme === 'light' && "border-primary bg-primary/5"
+                    "flex cursor-pointer flex-col items-center justify-between rounded-md border-2 p-3 transition-all duration-200",
+                    "dark:border-slate-700 dark:text-gray-500 dark:bg-transparent",
+                    "border-slate-300 text-slate-800 bg-transparent",
+                    "hover:border-orange-500 hover:text-orange-500",
+                    "dark:hover:bg-orange-500/30 dark:hover:border-orange-700",
+                    "hover:bg-orange-100",
+                    currentTheme.theme === 'light' && "dark:bg-orange-700 dark:border-orange-500 dark:text-orange-500",
+                    currentTheme.theme === 'light' && "bg-orange-100 border-orange-500 text-orange-500"
                   )}
                 >
-                  <Sun className="h-5 w-5" />
-                  <span>{t('theme.light', 'Sáng')}</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => {
-                    themeManager.setTheme({ theme: 'dark' });
-                  }}
+                  <RadioGroupItem value="light" id="theme-light" className="sr-only" />
+                  <Sun className="mb-2 h-5 w-5" />
+                  <span className="text-sm font-medium">{t('theme.light', 'Sáng')}</span>
+                </Label>
+                
+                <Label
+                  htmlFor="theme-dark"
                   className={cn(
-                    "flex flex-col items-center justify-center gap-1 h-auto py-3",
-                    currentTheme.theme === 'dark' && "border-primary bg-primary/5"
+                    "flex cursor-pointer flex-col items-center justify-between rounded-md border-2 p-3 transition-all duration-200",
+                    "dark:border-slate-700 dark:text-gray-500 dark:bg-transparent",
+                    "border-slate-300 text-slate-800 bg-transparent",
+                    "hover:border-orange-500 hover:text-orange-500",
+                    "dark:hover:bg-orange-500/30 dark:hover:border-orange-700",
+                    "hover:bg-orange-100",
+                    currentTheme.theme === 'dark' && "dark:bg-orange-700 dark:border-orange-500 dark:text-orange-500",
+                    currentTheme.theme === 'dark' && "bg-orange-100 border-orange-500 text-orange-500"
                   )}
                 >
-                  <Moon className="h-5 w-5" />
-                  <span>{t('theme.dark', 'Tối')}</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => {
-                    themeManager.setTheme({ theme: 'system' });
-                  }}
+                  <RadioGroupItem value="dark" id="theme-dark" className="sr-only" />
+                  <Moon className="mb-2 h-5 w-5" />
+                  <span className="text-sm font-medium">{t('theme.dark', 'Tối')}</span>
+                </Label>
+                
+                <Label
+                  htmlFor="theme-system"
                   className={cn(
-                    "flex flex-col items-center justify-center gap-1 h-auto py-3",
-                    currentTheme.theme === 'system' && "border-primary bg-primary/5"
+                    "flex cursor-pointer flex-col items-center justify-between rounded-md border-2 p-3 transition-all duration-200",
+                    "dark:border-slate-700 dark:text-gray-500 dark:bg-transparent",
+                    "border-slate-300 text-slate-800 bg-transparent",
+                    "hover:border-orange-500 hover:text-orange-500",
+                    "dark:hover:bg-orange-500/30 dark:hover:border-orange-700",
+                    "hover:bg-orange-100",
+                    currentTheme.theme === 'system' && "dark:bg-orange-700 dark:border-orange-500 dark:text-orange-500",
+                    currentTheme.theme === 'system' && "bg-orange-100 border-orange-500 text-orange-500"
                   )}
                 >
-                  <Laptop className="h-5 w-5" />
-                  <span>{t('theme.system', 'Tự động')}</span>
-                </Button>
-              </div>
+                  <RadioGroupItem value="system" id="theme-system" className="sr-only" />
+                  <Laptop className="mb-2 h-5 w-5" />
+                  <span className="text-sm font-medium">{t('theme.system', 'Tự động')}</span>
+                </Label>
+              </RadioGroup>
             </div>
-            <div className="space-y-2">
-              <h3 className="text-sm font-medium">{t('theme.style', 'Phong cách')}</h3>
-              <div className="grid grid-cols-3 gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => {
-                    themeManager.setTheme({ themeStyle: 'professional' });
-                  }}
+            
+            {/* Phong cách */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium text-foreground">
+                {t('theme.style', 'Phong cách')}
+              </Label>
+              
+              <RadioGroup 
+                value={currentTheme.themeStyle}
+                className="grid grid-cols-3 gap-3"
+                onValueChange={(value) => themeManager.setTheme({ themeStyle: value as ThemeStyle })}
+              >
+                <Label
+                  htmlFor="style-professional"
                   className={cn(
-                    "flex flex-col items-center justify-center gap-1 h-auto py-3",
-                    currentTheme.themeStyle === 'professional' && "border-primary bg-primary/5"
+                    "flex cursor-pointer flex-col items-center justify-between rounded-md border-2 p-3 transition-all duration-200",
+                    "dark:border-slate-700 dark:text-gray-500 dark:bg-transparent",
+                    "border-slate-300 text-slate-800 bg-transparent",
+                    "hover:border-orange-500 hover:text-orange-500",
+                    "dark:hover:bg-orange-500/30 dark:hover:border-orange-700",
+                    "hover:bg-orange-100",
+                    currentTheme.themeStyle === 'professional' && "dark:bg-orange-700 dark:border-orange-500 dark:text-orange-500",
+                    currentTheme.themeStyle === 'professional' && "bg-orange-100 border-orange-500 text-orange-500"
                   )}
                 >
-                  <div className="size-5 flex items-center justify-center">
-                    <div className="size-4 bg-primary rounded-md"></div>
+                  <RadioGroupItem value="professional" id="style-professional" className="sr-only" />
+                  <div className="mb-2 size-6 flex items-center justify-center">
+                    <div className="size-5 bg-primary rounded-md"></div>
                   </div>
-                  <span>{t('theme.professional', 'Tiêu chuẩn')}</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => {
-                    themeManager.setTheme({ themeStyle: 'tint' });
-                  }}
+                  <span className="text-sm font-medium">{t('theme.professional', 'Tiêu chuẩn')}</span>
+                </Label>
+                
+                <Label
+                  htmlFor="style-tint"
                   className={cn(
-                    "flex flex-col items-center justify-center gap-1 h-auto py-3",
-                    currentTheme.themeStyle === 'tint' && "border-primary bg-primary/5"
+                    "flex cursor-pointer flex-col items-center justify-between rounded-md border-2 p-3 transition-all duration-200",
+                    "dark:border-slate-700 dark:text-gray-500 dark:bg-transparent",
+                    "border-slate-300 text-slate-800 bg-transparent",
+                    "hover:border-orange-500 hover:text-orange-500",
+                    "dark:hover:bg-orange-500/30 dark:hover:border-orange-700",
+                    "hover:bg-orange-100",
+                    currentTheme.themeStyle === 'tint' && "dark:bg-orange-700 dark:border-orange-500 dark:text-orange-500",
+                    currentTheme.themeStyle === 'tint' && "bg-orange-100 border-orange-500 text-orange-500"
                   )}
                 >
-                  <div className="size-5 flex items-center justify-center">
-                    <div className="size-4 bg-primary/20 rounded-md border border-primary"></div>
+                  <RadioGroupItem value="tint" id="style-tint" className="sr-only" />
+                  <div className="mb-2 size-6 flex items-center justify-center">
+                    <div className="size-5 bg-primary/20 rounded-md border border-primary"></div>
                   </div>
-                  <span>{t('theme.tint', 'Màu nhẹ')}</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => {
-                    themeManager.setTheme({ themeStyle: 'vibrant' });
-                  }}
+                  <span className="text-sm font-medium">{t('theme.tint', 'Màu nhẹ')}</span>
+                </Label>
+                
+                <Label
+                  htmlFor="style-vibrant"
                   className={cn(
-                    "flex flex-col items-center justify-center gap-1 h-auto py-3",
-                    currentTheme.themeStyle === 'vibrant' && "border-primary bg-primary/5"
+                    "flex cursor-pointer flex-col items-center justify-between rounded-md border-2 p-3 transition-all duration-200",
+                    "dark:border-slate-700 dark:text-gray-500 dark:bg-transparent",
+                    "border-slate-300 text-slate-800 bg-transparent",
+                    "hover:border-orange-500 hover:text-orange-500",
+                    "dark:hover:bg-orange-500/30 dark:hover:border-orange-700",
+                    "hover:bg-orange-100",
+                    currentTheme.themeStyle === 'vibrant' && "dark:bg-orange-700 dark:border-orange-500 dark:text-orange-500",
+                    currentTheme.themeStyle === 'vibrant' && "bg-orange-100 border-orange-500 text-orange-500"
                   )}
                 >
-                  <div className="size-5 flex items-center justify-center">
-                    <div className="size-4 bg-gradient-to-br from-primary to-blue-400 rounded-md"></div>
+                  <RadioGroupItem value="vibrant" id="style-vibrant" className="sr-only" />
+                  <div className="mb-2 size-6 flex items-center justify-center">
+                    <div className="size-5 bg-gradient-to-br from-primary to-blue-400 rounded-md"></div>
                   </div>
-                  <span>{t('theme.vibrant', 'Nổi bật')}</span>
-                </Button>
-              </div>
+                  <span className="text-sm font-medium">{t('theme.vibrant', 'Nổi bật')}</span>
+                </Label>
+              </RadioGroup>
             </div>
           </div>
-          <DialogFooter>
+          
+          <DialogFooter className="pt-2">
             <DialogClose asChild>
-              <Button>{t('common.done', 'Hoàn tất')}</Button>
+              <Button 
+                size="default"
+                variant="default"
+                className="rounded-md font-medium px-6 transition-colors bg-orange-600 hover:bg-orange-700 text-white dark:bg-orange-700 dark:hover:bg-orange-800"
+              >
+                {t('common.done', 'Hoàn tất')}
+              </Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>
@@ -524,24 +599,115 @@ export function MainSidebar({ children }: { children: React.ReactNode }) {
 // Chúng ta sẽ không sử dụng useOverlay hook nữa
 // Mà thay vào đó, xử lý trực tiếp trong các sự kiện click
 
-// Dynamic Menu Item Component
-function DynamicMenuItem({ menu }: { menu: MenuType }) {
+// Dynamic Menu Item Component - Hỗ trợ đa cấp thông qua tham số level
+function DynamicMenuItem({ menu, level = 0 }: { menu: MenuType, level?: number }) {
   const [isOpen, setIsOpen] = useState(false);
   const [location] = useLocation();
   const hasChildren = menu.core_dynamic_child_menus && menu.core_dynamic_child_menus.length > 0;
-
-  // Kiểm tra xem có submenu đang được chọn không
-  const hasActiveChild = menu.core_dynamic_child_menus?.some(
-    subMenu => location === `/submission/${subMenu.workflow_id}` || 
-               location === `/menu/${menu.id}/submenu/${subMenu.id}`
-  );
-
-  // Tự động mở menu có menu con đang được chọn
+  const screenSize = useScreenSize(); 
+  const isDesktopOrTablet = screenSize === 'desktop' || screenSize === 'tablet';
+  const {toggleSidebar} = useSidebar();
+  
+  // Lắng nghe custom event để đóng menu khi menu khác được mở
   useEffect(() => {
-    if (hasActiveChild && !isOpen) {
+    // Chỉ áp dụng cho menu cấp 1 (level 0)
+    if (level === 0) {
+      const handleSidebarMenuToggle = (event: CustomEvent) => {
+        // Nếu event từ một menu khác, đóng menu này nếu đang mở
+        if (event.detail && event.detail.menuId !== menu.id && isOpen) {
+          setIsOpen(false);
+        }
+      };
+      
+      // Thêm event listener
+      window.addEventListener('sidebar-menu-toggle', handleSidebarMenuToggle as EventListener);
+      
+      // Cleanup
+      return () => {
+        window.removeEventListener('sidebar-menu-toggle', handleSidebarMenuToggle as EventListener);
+      };
+    }
+  }, [menu.id, isOpen, level]);
+
+  // Cải thiện kiểm tra route active với regex patterns
+  const isExactPathActive = (path: string): boolean => {
+    if (!path) return false;
+    // Kiểm tra chính xác đường dẫn
+    return location === path;
+  };
+  
+  const isPathPartialMatch = (path: string): boolean => {
+    // Kiểm tra nếu đường dẫn hiện tại bắt đầu với path
+    if (!path) return false;
+    const currentPath = location.toLowerCase();
+    
+    // Chuẩn hóa path để đảm bảo có dấu / ở cuối nếu là prefix
+    const normalizedPath = path.toLowerCase().endsWith('/') 
+      ? path.toLowerCase() 
+      : path.toLowerCase() + '/';
+    
+    // Kiểm tra nếu đường dẫn hiện tại là chính xác path hoặc bắt đầu với path/
+    return currentPath === path.toLowerCase() || 
+           currentPath.startsWith(normalizedPath);
+  };
+  
+  // Chuẩn hóa route từ code routes trong menu
+  const getRouteFromCode = (code?: string): string | null => {
+    if (!code) return null;
+    
+    // Ví dụ: nếu menu có code "quan-ly-hang-hoa", convert thành "/quan-ly-hang-hoa"
+    const cleanCode = code.toLowerCase().trim();
+    return cleanCode.startsWith('/') ? cleanCode : `/${cleanCode}`;
+  };
+
+  // Kiểm tra xem có submenu đang được chọn không - hỗ trợ đệ quy đa cấp
+  const checkForActiveChild = (items: MenuType[] = []): boolean => {
+    return items.some(item => {
+      // Lấy đường dẫn từ code (nếu có)
+      const codeRoute = getRouteFromCode(item.code);
+      
+      // Kiểm tra menu con này có được chọn không - bổ sung kiểm tra partial match và code
+      const isActive = isExactPathActive(`/submission/${item.workflow_id}`) || 
+                       isExactPathActive(`/menu/${item.id}`) ||
+                       isExactPathActive(`/menu/${menu.id}/submenu/${item.id}`) ||
+                       isPathPartialMatch(`/forms/${item.workflow_id}`) ||
+                       isPathPartialMatch(`/workflow/${item.id}`) ||
+                       isPathPartialMatch(`/form-builder/${item.id}`) ||
+                       (codeRoute && (isExactPathActive(codeRoute) || isPathPartialMatch(codeRoute)));
+                      
+      // Nếu menu con này có menu con khác, kiểm tra đệ quy
+      if (item.core_dynamic_child_menus?.length) {
+        return isActive || checkForActiveChild(item.core_dynamic_child_menus);
+      }
+      
+      return isActive;
+    });
+  };
+  
+  const hasActiveChild = checkForActiveChild(menu.core_dynamic_child_menus);
+
+  // Lấy đường dẫn từ code (nếu có)
+  const currentMenuCodeRoute = getRouteFromCode(menu.code);
+
+  // Kiểm tra xem chính menu này có được chọn không
+  const isCurrentMenuActive = isExactPathActive(`/menu/${menu.id}`) || 
+                             isPathPartialMatch(`/forms/${menu.workflow_id}`) ||
+                             isPathPartialMatch(`/workflow/${menu.id}`) ||
+                             isPathPartialMatch(`/form-builder/${menu.id}`) ||
+                             (currentMenuCodeRoute && (isExactPathActive(currentMenuCodeRoute) || 
+                                                     isPathPartialMatch(currentMenuCodeRoute)));
+
+  // Tự động mở menu có menu con đang được chọn, giữ mở nếu đang được chọn
+  useEffect(() => {
+    // Nếu menu này hoặc con active, mở menu này
+    if ((hasActiveChild || isCurrentMenuActive) && !isOpen) {
       setIsOpen(true);
     }
-  }, [location, hasActiveChild]);
+    // Nếu không có con active và không phải menu đích, đóng menu
+    else if (!hasActiveChild && !isCurrentMenuActive && isOpen) {
+      setIsOpen(false);
+    }
+  }, [location, hasActiveChild, isCurrentMenuActive]);
   
   // Xử lý đóng sidebar khi click vào menu trên thiết bị di động
   const handleMobileMenuClick = () => {
@@ -577,30 +743,69 @@ function DynamicMenuItem({ menu }: { menu: MenuType }) {
     }
   };
   
+  // Import lucide icons cho từng loại menu
+  const getMenuIcon = () => {
+    // Nếu là menu con (cấp 2 trở lên), không hiển thị icon
+    if (level > 0) {
+      return null;
+    }
+    
+    // Từ danh sách icon được cung cấp
+    // Tìm icon phù hợp dựa trên tên menu
+    const menuName = menu.name.toLowerCase();
+    
+    if (menuName.includes('tox')) {
+      return <Box className="size-4 mr-2 flex-shrink-0" />;
+    } else if (menuName.includes('vật tư') || menuName.includes('sản phẩm')) {
+      return <Package className="size-4 mr-2 flex-shrink-0" />;
+    } else if (menuName.includes('kế hoạch')) {
+      return <Calendar className="size-4 mr-2 flex-shrink-0" />;
+    } else if (menuName.includes('phê duyệt')) {
+      return <CheckCircle className="size-4 mr-2 flex-shrink-0" />;
+    } else if (menuName.includes('khuôn') || menuName.includes('mẫu')) {
+      return <Layers className="size-4 mr-2 flex-shrink-0" />;
+    } else if (menuName.includes('chất lượng') || menuName.includes('qc')) {
+      return <Shield className="size-4 mr-2 flex-shrink-0" />;
+    } else if (menuName.includes('thiết bị')) {
+      return <Settings className="size-4 mr-2 flex-shrink-0" />;
+    } else if (menuName.includes('warehouse') || menuName.includes('kho')) {
+      return <Archive className="size-4 mr-2 flex-shrink-0" />;
+    } else if (menuName.includes('form')) {
+      return <Clipboard className="size-4 mr-2 flex-shrink-0" />;
+    } else {
+      // Icon mặc định cho các menu khác
+      return <FileText className="size-4 mr-2 flex-shrink-0" />;
+    }
+  };
+
+  const menuIcon = getMenuIcon();
+  
   if (!hasChildren) {
-    const isActive = location === `/menu/${menu.id}`;
     return (
       <SidebarMenuItem>
         <SidebarMenuButton
           asChild
-          onClick={handleMobileMenuClick}
-          className={`transition-all whitespace-normal ${
-            isActive ? 'bg-sidebar-accent text-sidebar-primary font-medium' : 'hover:bg-sidebar-accent/50'
-          }`}
+          onClick={()=>{
+            handleMobileMenuClick()
+            toggleSidebar()
+          }}
+          data-active={isCurrentMenuActive}
+          className={cn(
+            "transition-all whitespace-normal",
+            isCurrentMenuActive 
+              ? "bg-slate-800 text-white font-medium" 
+              : "text-gray-400 hover:bg-slate-800 hover:text-white"
+          )}
         >
           <Link href={`/menu/${menu.id}`} className="w-full flex items-center">
-            <div className="flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary mr-2 flex-shrink-0">
-              <svg xmlns="http://www.w3.org/2000/svg" className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                <polyline points="14 2 14 8 20 8" />
-              </svg>
-            </div>
-            <span className="min-w-0 flex-1 overflow-hidden break-words hyphens-auto leading-tight">{menu.name}</span>
-            {menu.code && (
-              <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-primary/5 text-primary-foreground/70 whitespace-nowrap flex-shrink-0">
-                {menu.code}
-              </span>
+            {menuIcon}
+            {/* Menu con không có icon (sử dụng left padding tăng dần) */}
+            {!menuIcon && level > 0 && (
+              <div className="w-4 ml-2"></div>
             )}
+            <span className="min-w-0 flex-1 overflow-hidden break-words hyphens-auto leading-tight">
+              {menu.name}
+            </span>
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -610,81 +815,67 @@ function DynamicMenuItem({ menu }: { menu: MenuType }) {
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
-        onClick={() => setIsOpen(!isOpen)}
-        className={`transition-all whitespace-normal ${
-          isOpen || hasActiveChild ? 'bg-sidebar-accent text-sidebar-primary font-medium' : 'hover:bg-sidebar-accent/50'
-        }`}
-      >
-        <div className="flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary mr-2 flex-shrink-0">
-          <svg xmlns="http://www.w3.org/2000/svg" className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" />
-          </svg>
-        </div>
-        <span className="text-sm min-w-0 flex-1 overflow-hidden break-words hyphens-auto leading-tight">{menu.name}</span>
-        {menu.code && (
-          <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-primary/5 text-primary-foreground/70 whitespace-nowrap flex-shrink-0">
-            {menu.code}
-          </span>
+        onClick={() => {
+          // Đóng các menu khác khi mở menu này (chỉ áp dụng khi level 0 - menu cấp 1)
+          if (level === 0 && !isOpen) {
+            // Gửi một custom event để thông báo cho các menu khác đóng lại
+            const event = new CustomEvent('sidebar-menu-toggle', {
+              detail: { menuId: menu.id }
+            });
+            window.dispatchEvent(event);
+          }
+          
+          setIsOpen(!isOpen)
+          handleMobileMenuClick()
+        }}
+        data-active={isCurrentMenuActive}
+        data-has-active-child={hasActiveChild && !isCurrentMenuActive}
+        className={cn(
+          "transition-all whitespace-normal relative",
+          isCurrentMenuActive 
+            ? "bg-slate-800 text-white font-medium" 
+            : hasActiveChild
+              ? "bg-slate-800/50 text-white font-medium"
+              : "text-gray-400 hover:bg-slate-800 hover:text-white"
         )}
+      >
+        {menuIcon}
+        {/* Menu con không có icon (sử dụng left padding tăng dần) */}
+        {!menuIcon && level > 0 && (
+          <div className="w-4 ml-2"></div>
+        )}
+        <span className="text-sm min-w-0 flex-1 overflow-hidden break-words hyphens-auto leading-tight">
+          {menu.name}
+        </span>
+        
+        {/* Thêm dấu mũi tên chỉ trạng thái mở/đóng của menu cha */}
+        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+          {isOpen ? (
+            <ChevronDown className="size-3.5 opacity-60" />
+          ) : (
+            <ChevronRight className="size-3.5 opacity-60" />
+          )}
+        </div>
       </SidebarMenuButton>
 
-      {isOpen && menu.core_dynamic_child_menus && (
-        <SidebarMenuSub className="animate-in slide-in-from-left-1 duration-200">
-          {menu.core_dynamic_child_menus.map((subMenu) => {
-            let href = "";
-            // Xử lý đặc biệt cho tất cả các submenu
-            if (subMenu.workflow_id) {
-              href = `/submission/${subMenu.workflow_id}?menuId=${subMenu.id}`;
-            } else {
-              href = `/menu/${menu.id}/submenu/${subMenu.id}`;
-            }
-            const isActive = location === href || location.startsWith(`/submission/${subMenu.workflow_id}`);
-            
-            const handleSubmenuClick = (e: React.MouseEvent) => {
-              // Xử lý đã được thực hiện trong component Submission thông qua menuId param
-              console.log(`Navigating to submenu: ${subMenu.name}, ID: ${subMenu.id}, workflowId: ${subMenu.workflow_id}`);
-              
-              // Đóng sidebar trên thiết bị di động sau khi chọn submenu
-              handleMobileMenuClick();
-            };
-            
-            return (
-              <SidebarMenuSubButton
-                key={subMenu.id}
-                asChild
-                className={`pl-8 flex items-center gap-1.5 transition-all text-sm w-full ${
-                  isActive ? 'bg-sidebar-accent text-sidebar-primary font-medium' : 'hover:bg-sidebar-accent/50'
-                }`}
-                onClick={handleSubmenuClick}
-              >
-                <Link href={href} className="py-1.5 w-full flex items-start">
-                  <div className="flex items-center w-full">
-                    <div className="flex-shrink-0 mr-1">
-                      {subMenu.workflow_id ? (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-                          <circle cx="9" cy="7" r="4"></circle>
-                          <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
-                          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                        </svg>
-                      ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M2 9V5c0-1.1.9-2 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1"></path>
-                          <path d="M2 13h10"></path>
-                          <path d="m9 16 3-3-3-3"></path>
-                        </svg>
-                      )}
-                    </div>
-                    <div className="flex min-w-0 flex-grow">
-                      <div className="text-sm font-medium overflow-hidden break-words hyphens-auto leading-tight">{subMenu.name}</div>
-                    </div>
-                  </div>
-                </Link>
-              </SidebarMenuSubButton>
-            );
-          })}
+      {/* Sử dụng max-height và transition để tạo hiệu ứng mượt mà */}
+      <div 
+        className={cn(
+          "overflow-hidden transition-all duration-300",
+          isOpen ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
+        )}
+      >
+        <SidebarMenuSub 
+          className={cn(
+            "pl-2 border-l-2 border-slate-700 bg-slate-900/50"
+          )}
+        >
+          {menu.core_dynamic_child_menus && menu.core_dynamic_child_menus.map((subMenu: MenuType) => (
+            // Gọi đệ quy DynamicMenuItem cho menu con, tăng cấp độ lên 1
+            <DynamicMenuItem key={subMenu.id} menu={subMenu} level={level + 1} />
+          ))}
         </SidebarMenuSub>
-      )}
+      </div>
     </SidebarMenuItem>
   );
 }

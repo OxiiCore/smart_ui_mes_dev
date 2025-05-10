@@ -10,10 +10,11 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Loader2, Check } from 'lucide-react';
-import { fetchForms, fetchFormFields, fetchMenuForms, fetchAllMenus } from '@/lib/api';
+import { fetchForms, fetchFormFields, fetchMenuForms, fetchAllMenus, fetchSearchOptions } from '@/lib/api';
 import { Form, Field, FormField, FieldSubmission, FormSubmission } from '@/lib/types';
 import { useTranslation } from 'react-i18next';
 import { toast } from '@/hooks/use-toast';
+import Select, { SingleValue, ActionMeta } from 'react-select';
 
 interface AddSubmissionDialogProps {
   onSubmit: (submission: FormSubmission) => Promise<void>;
@@ -30,16 +31,25 @@ export function AddSubmissionDialog({ onSubmit, workflowId }: AddSubmissionDialo
   const [isLoadingFields, setIsLoadingFields] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Các state mới để quản lý hiển thị các màn hình và giá trị field
-  const [step, setStep] = useState<'select_form' | 'enter_data'>('select_form');
+  // Chỉ dùng một bước nhập dữ liệu thay vì hai bước
+  const [step, setStep] = useState<'enter_data'>('enter_data');
   const [fieldValues, setFieldValues] = useState<Record<string, any>>({});
   
-  // Tải danh sách form khi mở dialog
+  // Tải danh sách form khi mở dialog và tự động chọn form đầu tiên
   useEffect(() => {
     if (isOpen) {
-      loadForms();
+      loadForms().then(() => {
+        // Trong useEffect không thể trực tiếp sử dụng giá trị forms mới nhất
+        // Vì vậy, chúng ta sẽ lấy giá trị mới trong callback của loadForms()
+        setTimeout(() => {
+          if (forms.length > 0) {
+            console.log("Auto-selecting first form:", forms[0].id);
+            handleFormSelect(forms[0].id);
+          }
+        }, 100);
+      });
     }
-  }, [isOpen]);
+  }, [isOpen, forms.length]);
   
   // Tải danh sách fields khi chọn form
   useEffect(() => {
@@ -185,7 +195,8 @@ export function AddSubmissionDialog({ onSubmit, workflowId }: AddSubmissionDialo
           (formField: any) => ({
             ...formField.core_dynamic_field,
             position: formField.position,
-            is_required: formField.is_required
+            is_required: formField.is_required,
+            option_id: formField.option_id
           })
         );
         
@@ -257,6 +268,10 @@ export function AddSubmissionDialog({ onSubmit, workflowId }: AddSubmissionDialo
               defaultValue = 'option1';
             }
             break;
+          case 'SEARCH':
+            // For SEARCH field type, default value is null or empty object
+            defaultValue = null;
+            break;
           case 'MULTI_CHOICE':
             defaultValue = [];
             break;
@@ -289,9 +304,9 @@ export function AddSubmissionDialog({ onSubmit, workflowId }: AddSubmissionDialo
     }
   };
   
-  // Hàm xử lý khi người dùng quay lại bước chọn form
+  // Không còn sử dụng step chọn form nữa, nhưng giữ lại hàm này để tương thích với code khác
   const handleBackStep = () => {
-    setStep('select_form');
+    // Không làm gì cả
   };
   
   // Hàm xử lý khi người dùng thay đổi giá trị của field
@@ -333,7 +348,6 @@ export function AddSubmissionDialog({ onSubmit, workflowId }: AddSubmissionDialo
       // Đóng dialog sau khi submit thành công
       setIsOpen(false);
       setSelectedFormId(null);
-      setStep('select_form');
       setFieldValues({});
     } catch (error) {
       console.error('Error creating submission:', error);
@@ -348,7 +362,6 @@ export function AddSubmissionDialog({ onSubmit, workflowId }: AddSubmissionDialo
     if (!open) {
       setSelectedFormId(null);
       setFields([]);
-      setStep('select_form');
       setFieldValues({});
       setIsLoadingFields(false);
       setIsSubmitting(false);
@@ -364,115 +377,30 @@ export function AddSubmissionDialog({ onSubmit, workflowId }: AddSubmissionDialo
         </Button>
       </DialogTrigger>
       
-      <DialogContent className="sm:max-w-[600px] p-0 border-none shadow-lg rounded-lg overflow-hidden">
+      <DialogContent className="dialog-content sm:max-w-[600px] p-0 shadow-lg rounded-2xl overflow-hidden">
         <DialogHeader className="bg-muted/30 border-b p-6">
           <DialogTitle className="text-xl font-bold text-primary">
-            {step === 'select_form' ? 
-              t('submission.createNew', 'Tạo biểu mẫu mới') : 
-              t('submission.enterData', 'Nhập dữ liệu')
-            }
+            {t('submission.enterData', 'Nhập dữ liệu')}
           </DialogTitle>
           <DialogDescription className="text-muted-foreground mt-1">
-            {step === 'select_form' ? 
-              t('submission.selectFormDescription', 'Chọn loại biểu mẫu bạn muốn tạo.') : 
-              t('submission.enterDataDescription', 'Vui lòng nhập thông tin vào biểu mẫu.')
-            }
+            {t('submission.enterDataDescription', 'Vui lòng nhập thông tin vào biểu mẫu.')}
           </DialogDescription>
         </DialogHeader>
         
-        {/* Bước 1: Chọn loại form */}
-        {step === 'select_form' && (
+        {/* Bước nhập dữ liệu cho form */}
+        {isLoadingForms || isLoadingFields ? (
           <div className="p-6">
-            {isLoadingForms ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="relative w-16 h-16">
-                  <Loader2 className="h-16 w-16 animate-spin text-primary/30 absolute" />
-                  <Loader2 className="h-16 w-16 animate-spin text-primary absolute animate-delay-100" style={{animationDelay: "0.1s"}} />
-                </div>
-                <span className="mt-4 text-muted-foreground font-medium">
-                  {t('common.loading', 'Đang tải...')}
-                </span>
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="relative w-16 h-16">
+                <Loader2 className="h-16 w-16 animate-spin text-primary/30 absolute" />
+                <Loader2 className="h-16 w-16 animate-spin text-primary absolute animate-delay-100" style={{animationDelay: "0.1s"}} />
               </div>
-            ) : (
-              <>
-                <h3 className="mb-4 text-sm font-medium text-foreground flex items-center">
-                  <span className="w-1.5 h-1.5 bg-primary rounded-full mr-2"></span>
-                  {t('submission.availableForms', 'Các biểu mẫu có sẵn:')}
-                </h3>
-                
-                <div className="grid grid-cols-1 gap-3 max-h-[350px] overflow-y-auto pr-2 scroll-smooth">
-                  {forms.length > 0 ? (
-                    forms.map((form) => (
-                      <div 
-                        key={form.id}
-                        className={`group p-4 border rounded-lg cursor-pointer transition-all duration-200 ${
-                          selectedFormId === form.id 
-                            ? 'bg-primary/10 border-primary shadow-sm' 
-                            : 'hover:bg-background/80 hover:border-primary/20 hover:shadow-sm'
-                        }`}
-                        onClick={() => handleFormSelect(form.id)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <h4 className={`font-medium ${selectedFormId === form.id ? 'text-primary' : ''}`}>
-                            {form.name}
-                          </h4>
-                          {selectedFormId === form.id ? (
-                            <div className="h-6 w-6 rounded-full bg-primary text-white flex items-center justify-center">
-                              <Check className="h-4 w-4" />
-                            </div>
-                          ) : (
-                            <div className="h-6 w-6 rounded-full border-2 border-muted-foreground/30 group-hover:border-primary/40 transition-colors"></div>
-                          )}
-                        </div>
-                        {form.description && (
-                          <p className="text-sm text-muted-foreground mt-1.5">{form.description}</p>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-10 px-4 border border-dashed rounded-lg">
-                      <svg 
-                        xmlns="http://www.w3.org/2000/svg" 
-                        width="36" 
-                        height="36" 
-                        viewBox="0 0 24 24" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        strokeWidth="1" 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round" 
-                        className="mx-auto mb-4 text-muted-foreground/50"
-                      >
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <path d="M14 2v6h6"></path>
-                        <path d="M5 12h14"></path>
-                        <path d="M5 18h8"></path>
-                      </svg>
-                      <p className="text-muted-foreground font-medium">
-                        {t('submission.noFormsAvailable', 'Không có biểu mẫu nào.')}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-            
-            {isLoadingFields && (
-              <div className="flex items-center justify-center py-4 mt-4 border-t">
-                <div className="relative">
-                  <Loader2 className="h-5 w-5 animate-spin text-primary/30 absolute" />
-                  <Loader2 className="h-5 w-5 animate-spin text-primary absolute animate-delay-100" style={{animationDelay: "0.1s"}} />
-                </div>
-                <span className="ml-8 text-sm text-muted-foreground">
-                  {t('submission.loadingFormFields', 'Đang tải thông tin biểu mẫu...')}
-                </span>
-              </div>
-            )}
+              <span className="mt-4 text-muted-foreground font-medium">
+                {t('common.loading', 'Đang tải...')}
+              </span>
+            </div>
           </div>
-        )}
-        
-        {/* Bước 2: Nhập dữ liệu cho form */}
-        {step === 'enter_data' && (
+        ) : (
           <div className="p-6">
             <div className="space-y-6 max-h-[450px] overflow-y-auto pr-2 scroll-smooth">
               {fields.map((field) => (
@@ -535,6 +463,14 @@ export function AddSubmissionDialog({ onSubmit, workflowId }: AddSubmissionDialo
                       className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
                       value={fieldValues[field.id] ? new Date(fieldValues[field.id]).toISOString().slice(0, 10) : ''}
                       onChange={(e) => handleFieldValueChange(field.id, new Date(e.target.value).getTime())}
+                    />
+                  )}
+                  
+                  {field.field_type === 'SEARCH' && (
+                    <SearchableSelect 
+                      field={field}
+                      value={fieldValues[field.id]}
+                      onChange={(value) => handleFieldValueChange(field.id, value)}
                     />
                   )}
                   
@@ -1105,51 +1041,96 @@ export function AddSubmissionDialog({ onSubmit, workflowId }: AddSubmissionDialo
         )}
         
         <DialogFooter className="border-t p-4 flex-row justify-between gap-2">
-          {step === 'select_form' ? (
-            <>
-              <Button 
-                variant="outline" 
-                onClick={() => setIsOpen(false)}
-                className="border-gray-300 hover:bg-background flex items-center gap-1"
-              >
-                <span>{t('actions.cancel', 'Hủy')}</span>
-              </Button>
-              <Button
-                onClick={handleNextStep}
-                disabled={!selectedFormId || isLoadingFields}
-                className="flex items-center gap-2 bg-primary hover:bg-primary/90 transition-colors"
-              >
-                <span>{t('actions.next', 'Tiếp theo')}</span>
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button 
-                variant="outline" 
-                onClick={handleBackStep}
-                className="border-gray-300 hover:bg-background flex items-center gap-1"
-              >
-                <span>{t('actions.back', 'Quay lại')}</span>
-              </Button>
-              <Button
-                onClick={handleCreateSubmission}
-                disabled={isSubmitting}
-                className="flex items-center gap-2 bg-primary hover:bg-primary/90 transition-colors"
-              >
-                {isSubmitting ? (
-                  <div className="relative">
-                    <Loader2 className="h-4 w-4 animate-spin text-white/30 absolute" />
-                    <Loader2 className="h-4 w-4 animate-spin text-white absolute animate-delay-100" style={{animationDelay: "0.1s"}} />
-                  </div>
-                ) : (
-                  <PlusCircle className="h-4 w-4" />
-                )}
-                <span>{t('submission.create', 'Tạo biểu mẫu')}</span>
-              </Button>
-            </>
-          )}
+          <div className="flex justify-end w-full">
+            <Button
+              onClick={handleCreateSubmission}
+              disabled={isSubmitting}
+              className="flex items-center gap-2 bg-primary hover:bg-primary/90 transition-colors"
+            >
+              {isSubmitting ? (
+                <div className="relative">
+                  <Loader2 className="h-4 w-4 animate-spin text-white/30 absolute" />
+                  <Loader2 className="h-4 w-4 animate-spin text-white absolute animate-delay-100" style={{animationDelay: "0.1s"}} />
+                </div>
+              ) : (
+                <PlusCircle className="h-4 w-4" />
+              )}
+              <span>{t('submission.create', 'Tạo biểu mẫu')}</span>
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// SearchableSelect component for SEARCH field type
+interface SearchableSelectProps {
+  field: Field | any;
+  value: any;
+  onChange: (value: any) => void;
+}
+
+function SearchableSelect({ field, value, onChange }: SearchableSelectProps) {
+  const [options, setOptions] = useState<{value: string, label: string}[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  useEffect(() => {
+    // Extract the option_id from the field's configuration 
+    const loadOptions = async () => {
+      console.log("Field:", field);
+      try {
+        setIsLoading(true);
+        
+        // Check if configuration exists and has option_id
+        if (!field.option_id) {
+          console.error("Field configuration is missing for SEARCH field:", field.id);
+          setOptions([]);
+          return;
+        }
+        
+        // Fetch search options from API
+        const response = await fetchSearchOptions(field.option_id);
+        
+        if (response.data && response.data.core_core_option_items) {
+          const fetchedOptions = response.data.core_core_option_items.map((option: any) => ({
+            value: option.id,
+            label: option.name || option.code
+          }));
+          setOptions(fetchedOptions);
+        } else {
+          console.error("Failed to fetch options or empty response");
+          setOptions([]);
+        }
+      } catch (error) {
+        console.error("Error loading search options:", error);
+        setOptions([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadOptions();
+  }, [field.id]);
+  
+  // Find the selected option based on the current value
+  const selectedOption = options.find(option => option.value === value) || null;
+  
+  const handleChange = (selected: SingleValue<{value: string, label: string}>, action: ActionMeta<{value: string, label: string}>) => {
+    onChange(selected ? selected.value : null);
+  };
+  
+  return (
+    <Select
+      className="w-full rounded-md focus:outline-none"
+      value={selectedOption}
+      onChange={handleChange}
+      options={options}
+      isLoading={isLoading}
+      isClearable
+      placeholder="Chọn hoặc tìm kiếm..."
+      noOptionsMessage={() => "Không có tùy chọn"}
+      loadingMessage={() => "Đang tải..."}
+    />
   );
 }

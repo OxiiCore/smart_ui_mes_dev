@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Calendar, ChevronRight } from 'lucide-react';
+import Select, { SingleValue, ActionMeta } from 'react-select';
 
 import {
   Dialog,
@@ -16,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { fetchTransitionForm, submitTransitionForm } from '@/lib/api';
+import { fetchTransitionForm, submitTransitionForm, fetchSearchOptions } from '@/lib/api';
 
 interface TransitionFormDialogProps {
   transitionId: string;
@@ -33,6 +34,15 @@ interface FormField {
   value: any;
   field_type: string;
   is_required?: boolean;
+  option_id?: string; // ID của option cho trường SEARCH
+  configuration?: string; // Configuration của field dưới dạng JSON string
+}
+
+// Interface cho SearchableSelect
+interface SearchableSelectProps {
+  field: FormField;
+  value: any;
+  onChange: (value: any) => void;
 }
 
 export function TransitionFormDialog({
@@ -70,8 +80,12 @@ export function TransitionFormDialog({
           name: field.core_dynamic_field.name,
           field_type: field.core_dynamic_field.field_type,
           value: getDefaultValueByType(field.core_dynamic_field.field_type),
-          is_required: field.is_required
+          is_required: field.is_required,
+          option_id: field.option_id, // Lấy option_id cho trường SEARCH
+          configuration: field.core_dynamic_field.configuration // Lấy configuration của field
         }));
+
+        console.log("Initial Values:", initialValues);
 
         setFormValues(initialValues);
       }
@@ -135,22 +149,9 @@ export function TransitionFormDialog({
   const handleOpen = (open: boolean) => {
     setIsOpen(open);
 
-    // Khởi tạo formValues từ dữ liệu API khi dialog mở
-    if (open && formData?.data?.core_core_dynamic_workflow_transitions_by_pk?.core_dynamic_form?.core_dynamic_form_fields) {
-      const fields = formData.data.core_core_dynamic_workflow_transitions_by_pk.core_dynamic_form.core_dynamic_form_fields;
-
-      // Map các field từ API sang định dạng formValues
-      // Sử dụng id của form_field để đảm bảo keys luôn unique ngay cả khi có trùng field
-      const initialValues = fields.map((field: any) => ({
-        id: field.core_dynamic_field.id,
-        form_field_id: field.id, // Thêm ID của form_field để tạo key duy nhất
-        name: field.core_dynamic_field.name,
-        field_type: field.core_dynamic_field.field_type,
-        value: getDefaultValueByType(field.core_dynamic_field.field_type),
-        is_required: field.is_required
-      }));
-
-      setFormValues(initialValues);
+    // Khi mở dialog, gọi ngay fetchAndSetFormFields để lấy dữ liệu và hiển thị
+    if (open && transitionId) {
+      fetchAndSetFormFields(transitionId);
     }
   };
 
@@ -168,6 +169,8 @@ export function TransitionFormDialog({
         return "1";
       case "MULTI_CHOICE":
         return ["1"];
+      case "SEARCH":
+        return null; // Giá trị mặc định cho SEARCH là null
       default:
         return "";
     }
@@ -195,6 +198,22 @@ export function TransitionFormDialog({
   // Render field input dựa vào loại
   const renderFieldInput = (field: FormField) => {
     switch (field.field_type) {
+      case 'SEARCH':
+        return (
+          <div className="grid gap-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-primary">{field.name}</span>
+              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">Tìm kiếm</span>
+            </div>
+            <div className="w-full">
+              <SearchableSelect 
+                field={field}
+                value={field.value}
+                onChange={(value) => handleValueChange(field.id, value)}
+              />
+            </div>
+          </div>
+        );
       case 'TEXT':
         return (
           <div className="grid gap-2">
@@ -368,7 +387,7 @@ export function TransitionFormDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px] w-[95vw] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="dialog-content sm:max-w-[600px] w-[95vw] max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 border-slate-200 shadow-xl">
         <DialogHeader>
           <DialogTitle className="text-xl font-medium text-blue-300">
             <div className="flex items-center">
@@ -381,20 +400,7 @@ export function TransitionFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="py-2 border-b">
-          <h3 className="text-base font-medium">Hành động có sẵn:</h3>
-          <div className="mt-2 flex space-x-2">
-            <span 
-              className="px-3 py-1 border border-blue-300 text-blue-300 rounded-full text-sm cursor-pointer hover:bg-blue-300/10 transition-colors duration-200"
-              onClick={() => {
-                // Tự động chọn transition hiện tại để hiện form
-                fetchAndSetFormFields(transitionId);
-              }}
-            >
-              {transitionName} →
-            </span>
-          </div>
-        </div>
+        {/* Đã tự động gọi fetchAndSetFormFields khi dialog mở */}
 
         {isLoading ? (
           <div className="py-6">
@@ -426,5 +432,72 @@ export function TransitionFormDialog({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Component SearchableSelect dùng react-select
+function SearchableSelect({ field, value, onChange }: SearchableSelectProps) {
+  const [options, setOptions] = useState<{value: string, label: string}[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  useEffect(() => {
+    // Extract the option_id from the field 
+    const loadOptions = async () => {
+      try {
+        setIsLoading(true);
+        console.log("Field:", field);
+        // Check if field has option_id 
+        // Option ID to get in configuration with key 'option_id'
+        const optionId = field.option_id || JSON.parse(field.configuration || '{}').option_id;
+        
+        if (!optionId) {
+          console.error("Option ID is missing for SEARCH field:", field.id);
+          setOptions([]);
+          return;
+        }
+        
+        // Fetch search options from API
+        const response = await fetchSearchOptions(optionId);
+        
+        if (response.data && response.data.core_core_option_items) {
+          const fetchedOptions = response.data.core_core_option_items.map((option: any) => ({
+            value: option.id,
+            label: option.name || option.code
+          }));
+          setOptions(fetchedOptions);
+        } else {
+          console.error("Failed to fetch options or empty response");
+          setOptions([]);
+        }
+      } catch (error) {
+        console.error("Error loading search options:", error);
+        setOptions([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadOptions();
+  }, [field.id]);
+  
+  // Find the selected option based on the current value
+  const selectedOption = options.find(option => option.value === value) || null;
+  
+  const handleChange = (selected: SingleValue<{value: string, label: string}>, action: ActionMeta<{value: string, label: string}>) => {
+    onChange(selected ? selected.value : null);
+  };
+  
+  return (
+    <Select
+      className="w-full rounded-md focus:outline-none"
+      value={selectedOption}
+      onChange={handleChange}
+      options={options}
+      isLoading={isLoading}
+      isClearable
+      placeholder="Chọn hoặc tìm kiếm..."
+      noOptionsMessage={() => "Không có tùy chọn"}
+      loadingMessage={() => "Đang tải..."}
+    />
   );
 }

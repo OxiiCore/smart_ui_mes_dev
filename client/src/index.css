@@ -1,20 +1,24 @@
+@import "./components/ui/dialog.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* Ẩn các badge màu vàng và nhãn Approved, New trong sidebar */
-.bg-yellow-300, .bg-yellow-200, .bg-yellow-100, 
+.bg-yellow-300,
+.bg-yellow-200,
+.bg-yellow-100,
 [class*="bg-yellow"] {
   display: none !important;
 }
 
 /* Chỉ ẩn các span riêng biệt có thể là nhãn New/Approved, không ẩn text chính */
-[data-sidebar="menu-button"] > span.ml-auto,
-[data-sidebar="menu-sub-button"] > span.ml-auto,
-[data-sidebar="menu-button"] > div.bg-yellow-100,
-[data-sidebar="menu-sub-button"] > div.bg-yellow-100,
-[data-sidebar="menu-button"] > div[class*="bg-yellow"],
-[data-sidebar="menu-sub-button"] > div[class*="bg-yellow"] {
+[data-sidebar="menu-button"]>span.ml-auto,
+[data-sidebar="menu-sub-button"]>span.ml-auto,
+[data-sidebar="menu-button"]>div.bg-yellow-100,
+[data-sidebar="menu-sub-button"]>div.bg-yellow-100,
+[data-sidebar="menu-button"]>div[class*="bg-yellow"],
+[data-sidebar="menu-sub-button"]>div[class*="bg-yellow"] {
   display: none !important;
 }
 
@@ -30,7 +34,7 @@
 }
 
 .search-match {
-  background-color: rgba(0, 177, 210, 0.1);
+  background-color: rgba(253, 101, 29, 0.1);
   border-radius: 2px;
   padding: 0 2px;
   font-weight: 500;
@@ -43,8 +47,10 @@
     hyphens: auto;
   }
   
+  /* Dialog và popup có thể được styleshe từ dialog.css */
+
   /* Cải thiện cách xử lý xuống dòng cho chữ tiếng Việt */
-  .text-sm.text-muted-foreground, 
+  .text-sm.text-muted-foreground,
   .text-muted-foreground {
     word-break: break-word !important;
     overflow-wrap: break-word !important;
@@ -58,9 +64,9 @@
   /* Core Design System colors */
   --text-color: #232735;
   --text-color-secondary: #73798D;
-  --primary-color: #00B1D2;
+  --primary-color: #FD651D;
   --primary-color-text: #ffffff;
-  
+
   /* Surface colors */
   --surface-0: #ffffff;
   --surface-50: #FAFAFA;
@@ -78,24 +84,25 @@
   --surface-card: #ffffff;
   --surface-overlay: #ffffff;
   --surface-border: #dee2e6;
-  
+
   /* Layout variables */
   --content-padding: 1rem;
   --inline-spacing: 0.5rem;
   --border-radius: 0.5rem;
-  
+
   /* Blue color palette */
   --blue-50: #f4fafe;
   --blue-100: #cae6fc;
   --blue-200: #a0d2fa;
-  --blue-300: #00B1D2; /* Primary color */
+  --blue-300: #00B1D2;
+  /* Primary color */
   --blue-400: #4baaf5;
   --blue-500: #2196f3;
   --blue-600: #1c80cf;
   --blue-700: #1769aa;
   --blue-800: #125386;
   --blue-900: #0d3c61;
-  
+
   /* Green color palette */
   --green-50: #f6fbf6;
   --green-100: #d4ecd5;
@@ -107,19 +114,19 @@
   --green-700: #357b38;
   --green-800: #2a602c;
   --green-900: #1e4620;
-  
+
   /* Orange color palette */
   --orange-50: #fff8f2;
   --orange-100: #fde0c2;
   --orange-200: #fbc791;
   --orange-300: #FF9E17;
-  --orange-400: #f79530;
-  --orange-500: #f57c00;
-  --orange-600: #d06900;
-  --orange-700: #ac5700;
-  --orange-800: #874400;
-  --orange-900: #623200;
-  
+  --orange-400: #fd803f;
+  --orange-500: #FD651D; /* Màu primary mới */
+  --orange-600: #e55a18;
+  --orange-700: #c14c14;
+  --orange-800: #9d3e10;
+  --orange-900: #7a300c;
+
   /* Gray color palette */
   --gray-50: #FAFAFA;
   --gray-100: #F5F5F5;
@@ -131,7 +138,7 @@
   --gray-700: #616161;
   --gray-800: #323232;
   --gray-900: #1D1D1D;
-  
+
   /* Red color palette */
   --red-50: #fff5f5;
   --red-100: #ffd1ce;
@@ -143,141 +150,246 @@
   --red-700: #b32d23;
   --red-800: #8c231c;
   --red-900: #661a14;
-  
-  /* Light mode */
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 222.2 84% 4.9%;
-  --primary: 190 100% 42%;  /* #00B1D2 in HSL */
-  --primary-foreground: 0 0% 100%;
-  --secondary: 174 97% 44%;  /* #03DAC6 in HSL */
-  --secondary-foreground: 0 0% 0%;
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
-  --accent: 210 40% 96.1%;
-  --accent-foreground: 222.2 47.4% 11.2%;
-  --destructive: 346 87% 36%; /* #B00020 in HSL */
-  --destructive-foreground: 210 40% 98%;
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 190 100% 42%;
+
+  /* Light mode - Cập nhật theo yêu cầu với các semantic tokens mới */
+  --background: 0 0% 100%; /* bg-white */
+  --foreground: 230 16% 17%; /* #232735 - Màu text chính */
+  --card: 0 0% 100%; /* bg-white */
+  --card-foreground: 230 16% 17%; /* #232735 - Màu text chính */
+  --popover: 0 0% 100%; /* bg-white */
+  --popover-foreground: 230 16% 17%; /* #232735 - Màu text chính */
+  --primary: 19 98.2% 55.3%; /* #FD651D */
+  --primary-foreground: 0 0% 100%; /* text-white */
+  --secondary: 174 97% 44%; /* #03DAC6 */
+  --secondary-foreground: 0 0% 0%; /* text-black */
+  --muted: 210 40% 96.1%; /* bg-slate-50 */
+  --muted-foreground: 226 9% 50%; /* #73798D - Màu text phụ */
+  --accent: 210 40% 96.1%; /* bg-slate-50 */
+  --accent-foreground: 230 16% 17%; /* #232735 - Màu text chính */
+  --destructive: 350 100% 35%; /* #B00020 - Màu text lỗi */
+  --destructive-foreground: 0 0% 100%; /* text-white */
+  --success: 158 100% 41%; /* #00D18A - Màu text thành công */
+  --success-foreground: 0 0% 100%; /* text-white */
+  --warning: 35 100% 55%; /* #FF9E17 - Màu text cảnh báo */
+  --warning-foreground: 0 0% 100%; /* text-white */
+  --info: 19 98.2% 55.3%; /* #FD651D - Màu text thông tin */
+  --info-foreground: 0 0% 100%; /* text-white */
+  --disabled: 220 6% 66%; /* #A1A4B0 - Màu text bị disable */
+  --disabled-foreground: 0 0% 100%; /* text-white */
+  --placeholder: 223 9% 59%; /* #8B90A0 - Màu text placeholder */
+  --link: 19 98.2% 55.3%; /* #FD651D - Màu text link */
+  --link-hover: 19 98.2% 55.3% / 80%; /* #FD651D với opacity 80% */
+  --border: 214 32% 91%; /* border-slate-300 */
+  --input: 210 40% 96.1%; /* bg-slate-50 */
+  --ring: 215 20% 65%; /* focus:ring-slate-500 */
   --radius: var(--border-radius);
 
   /* Sidebar Colors - Light Mode */
-  --sidebar-background: 0 0% 98%;
-  --sidebar-foreground: 222.2 84% 4.9%;
-  --sidebar-primary: 190 100% 42%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 190 30% 94%;
-  --sidebar-accent-foreground: 222.2 47.4% 11.2%;
-  --sidebar-border: 214.3 31.8% 91.4%;
-  --sidebar-ring: 190 100% 42%;
+  --sidebar-background: 0 0% 100%; /* bg-white */
+  --sidebar-foreground: 215 25% 27%; /* text-slate-900 */
+  --sidebar-primary: 19 98.2% 55.3%; /* #FD651D */
+  --sidebar-primary-foreground: 0 0% 100%; /* text-white */
+  --sidebar-accent: 210 40% 96.1%; /* bg-slate-50 */
+  --sidebar-accent-foreground: 215 25% 27%; /* text-slate-900 */
+  --sidebar-border: 214 32% 91%; /* border-slate-300 */
+  --sidebar-ring: 19 98.2% 55.3%; /* #FD651D */
 }
 
 .dark {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
-  --card: 222.2 84% 4.9%;
-  --card-foreground: 210 40% 98%;
-  --popover: 222.2 84% 4.9%;
-  --popover-foreground: 210 40% 98%;
-  --primary: 190 100% 42%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 174 97% 44%;
-  --secondary-foreground: 0 0% 0%;
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
-  --accent: 217.2 32.6% 17.5%;
-  --accent-foreground: 210 40% 98%;
-  --destructive: 346 87% 36%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
-  --ring: 190 100% 42%;
-  
+  /* Cập nhật theo yêu cầu dark mode với các semantic tokens mới */
+  --background: 215 25% 5%; /* bg-slate-900 */
+  --foreground: 210 40% 98%; /* text-slate-100 */
+  --card: 215 25% 5%; /* bg-slate-900 */
+  --card-foreground: 210 40% 98%; /* text-slate-100 */
+  --popover: 215 25% 5%; /* bg-slate-900 */
+  --popover-foreground: 210 40% 98%; /* text-slate-100 */
+  --primary: 19 98.2% 55.3%; /* #FD651D */
+  --primary-foreground: 0 0% 100%; /* text-white */
+  --secondary: 174 97% 44%; /* #03DAC6 */
+  --secondary-foreground: 0 0% 0%; /* text-black */
+  --muted: 215 20% 17%; /* bg-slate-800 */
+  --muted-foreground: 226 9% 50%; /* #73798D - Màu text phụ */
+  --accent: 215 20% 17%; /* bg-slate-800 */
+  --accent-foreground: 210 40% 98%; /* text-slate-100 */
+  --destructive: 350 100% 35%; /* #B00020 - Màu text lỗi */
+  --destructive-foreground: 0 0% 100%; /* text-white */
+  --success: 158 100% 41%; /* #00D18A - Màu text thành công */
+  --success-foreground: 0 0% 100%; /* text-white */
+  --warning: 35 100% 55%; /* #FF9E17 - Màu text cảnh báo */
+  --warning-foreground: 0 0% 100%; /* text-white */
+  --info: 19 98.2% 55.3%; /* #FD651D - Màu text thông tin */
+  --info-foreground: 0 0% 100%; /* text-white */
+  --disabled: 220 6% 66%; /* #A1A4B0 - Màu text bị disable */
+  --disabled-foreground: 0 0% 100%; /* text-white */
+  --placeholder: 223 9% 59%; /* #8B90A0 - Màu text placeholder */
+  --link: 19 98.2% 55.3%; /* #FD651D - Màu text link */
+  --link-hover: 19 98.2% 55.3% / 80%; /* #FD651D với opacity 80% */
+  --border: 215 20% 30%; /* border-slate-700 */
+  --input: 215 20% 17%; /* bg-slate-800 */
+  --ring: 215 20% 65%; /* focus:ring-slate-500 */
+
   /* Sidebar Colors - Dark Mode */
-  --sidebar-background: 222 47% 11%;
-  --sidebar-foreground: 210 40% 98%;
-  --sidebar-primary: 190 100% 42%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 217.2 32.6% 17.5%;
-  --sidebar-accent-foreground: 210 40% 98%;
-  --sidebar-border: 217.2 32.6% 17.5%;
-  --sidebar-ring: 190 100% 42%;
+  --sidebar-background: 215 25% 5%; /* bg-slate-900 */
+  --sidebar-foreground: 210 40% 98%; /* text-slate-100 */
+  --sidebar-primary: 19 98.2% 55.3%; /* #FD651D */
+  --sidebar-primary-foreground: 0 0% 100%; /* text-white */
+  --sidebar-accent: 215 20% 17%; /* bg-slate-800 */
+  --sidebar-accent-foreground: 210 40% 98%; /* text-slate-100 */
+  --sidebar-border: 215 20% 30%; /* border-slate-700 */
+  --sidebar-ring: 19 98.2% 55.3%; /* #FD651D */
 }
 
 /* Vibrant Theme Style - Oxii Design System inspired */
 .theme-vibrant {
   --background: 0 0% 97.6%;
-  --foreground: 222.2 84% 4.9%;
+  --foreground: 230 16% 17%; /* #232735 - Màu text chính */
   --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
-  --primary: 190 100% 42%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 174 97% 44%;
-  --secondary-foreground: 0 0% 0%;
-  --accent: 180 50% 97%;
-  --accent-foreground: 190 100% 32%;
-  --ring: var(--oxii-primary);
-  
+  --card-foreground: 230 16% 17%; /* #232735 - Màu text chính */
+  --popover: 0 0% 100%;
+  --popover-foreground: 230 16% 17%; /* #232735 - Màu text chính */
+  --primary: 19 98.2% 55.3%; /* #FD651D */
+  --primary-foreground: 0 0% 100%; /* text-white */
+  --secondary: 174 97% 44%; /* #03DAC6 */
+  --secondary-foreground: 0 0% 0%; /* text-black */
+  --muted: 210 40% 96.1%; /* bg-slate-50 */
+  --muted-foreground: 226 9% 50%; /* #73798D - Màu text phụ */
+  --accent: 190 30% 97%;
+  --accent-foreground: 230 16% 17%; /* #232735 - Màu text chính */
+  --destructive: 350 100% 35%; /* #B00020 - Màu text lỗi */
+  --destructive-foreground: 0 0% 100%; /* text-white */
+  --success: 158 100% 41%; /* #00D18A - Màu text thành công */
+  --success-foreground: 0 0% 100%; /* text-white */
+  --warning: 35 100% 55%; /* #FF9E17 - Màu text cảnh báo */
+  --warning-foreground: 0 0% 100%; /* text-white */
+  --info: 19 98.2% 55.3%; /* #FD651D - Màu text thông tin */
+  --info-foreground: 0 0% 100%; /* text-white */
+  --disabled: 220 6% 66%; /* #A1A4B0 - Màu text bị disable */
+  --disabled-foreground: 0 0% 100%; /* text-white */
+  --placeholder: 223 9% 59%; /* #8B90A0 - Màu text placeholder */
+  --link: 19 98.2% 55.3%; /* #FD651D - Màu text link */
+  --link-hover: 19 98.2% 55.3% / 80%; /* #FD651D với opacity 80% */
+  --ring: 19 98.2% 55.3%; /* #FD651D */
+
   /* Sidebar Colors - Vibrant Light */
   --sidebar-background: 0 0% 100%;
-  --sidebar-foreground: 222.2 84% 4.9%;
+  --sidebar-foreground: 230 16% 17%; /* #232735 - Màu text chính */
+  --sidebar-primary: 19 98.2% 55.3%; /* #FD651D */
   --sidebar-accent: 190 30% 94%;
   --sidebar-accent-foreground: 190 100% 32%;
 }
 
 .dark.theme-vibrant {
-  --background: 222.2 47% 12%;
-  --foreground: 210 40% 98%;
-  --card: 222.2 47% 8%;
-  --card-foreground: 210 40% 98%;
-  --primary: 190 100% 42%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 174 97% 44%;
-  --secondary-foreground: 0 0% 0%;
+  --background: 215 25% 5%; /* bg-slate-900 */
+  --foreground: 210 40% 98%; /* text-slate-100 */
+  --card: 215 20% 10%;
+  --card-foreground: 210 40% 98%; /* text-slate-100 */
+  --popover: 215 25% 5%; /* bg-slate-900 */
+  --popover-foreground: 210 40% 98%; /* text-slate-100 */
+  --primary: 19 98.2% 55.3%; /* #FD651D */
+  --primary-foreground: 0 0% 100%; /* text-white */
+  --secondary: 174 97% 44%; /* #03DAC6 */
+  --secondary-foreground: 0 0% 0%; /* text-black */
+  --muted: 215 20% 17%; /* bg-slate-800 */
+  --muted-foreground: 226 9% 50%; /* #73798D - Màu text phụ */
   --accent: 190 70% 20%;
-  --accent-foreground: 210 40% 98%;
-  --ring: var(--oxii-primary);
-  
+  --accent-foreground: 210 40% 98%; /* text-slate-100 */
+  --destructive: 350 100% 35%; /* #B00020 - Màu text lỗi */
+  --destructive-foreground: 0 0% 100%; /* text-white */
+  --success: 158 100% 41%; /* #00D18A - Màu text thành công */
+  --success-foreground: 0 0% 100%; /* text-white */
+  --warning: 35 100% 55%; /* #FF9E17 - Màu text cảnh báo */
+  --warning-foreground: 0 0% 100%; /* text-white */
+  --info: 19 98.2% 55.3%; /* #FD651D - Màu text thông tin */
+  --info-foreground: 0 0% 100%; /* text-white */
+  --disabled: 220 6% 66%; /* #A1A4B0 - Màu text bị disable */
+  --disabled-foreground: 0 0% 100%; /* text-white */
+  --placeholder: 223 9% 59%; /* #8B90A0 - Màu text placeholder */
+  --link: 19 98.2% 55.3%; /* #FD651D - Màu text link */
+  --link-hover: 19 98.2% 55.3% / 80%; /* #FD651D với opacity 80% */
+  --ring: 19 98.2% 55.3%; /* #FD651D */
+
   /* Sidebar Colors - Vibrant Dark */
-  --sidebar-background: 222.2 47% 10%;
-  --sidebar-foreground: 210 40% 98%;
+  --sidebar-background: 215 25% 8%;
+  --sidebar-foreground: 210 40% 98%; /* text-slate-100 */
+  --sidebar-primary: 19 98.2% 55.3%; /* #FD651D */
   --sidebar-accent: 190 70% 20%;
-  --sidebar-accent-foreground: 210 40% 98%;
+  --sidebar-accent-foreground: 210 40% 98%; /* text-slate-100 */
 }
 
 /* Tint Theme Style */
 .theme-tint {
-  --primary: 190 100% 42%;
-  --background: 0 0% 100%;
+  --primary: 19 98.2% 55.3%; /* #FD651D */
+  --background: 0 0% 100%; /* bg-white */
+  --foreground: 230 16% 17%; /* #232735 - Màu text chính */
   --card: 190 30% 98%;
-  --secondary: 174 97% 44%;
+  --card-foreground: 230 16% 17%; /* #232735 - Màu text chính */
+  --popover: 0 0% 100%;
+  --popover-foreground: 230 16% 17%; /* #232735 - Màu text chính */
+  --secondary: 174 97% 44%; /* #03DAC6 */
+  --secondary-foreground: 0 0% 0%; /* text-black */
+  --muted: 210 40% 96.1%; /* bg-slate-50 */
+  --muted-foreground: 226 9% 50%; /* #73798D - Màu text phụ */
   --accent: 190 30% 96%;
-  --ring: var(--oxii-primary);
-  
+  --accent-foreground: 230 16% 17%; /* #232735 - Màu text chính */
+  --destructive: 350 100% 35%; /* #B00020 - Màu text lỗi */
+  --destructive-foreground: 0 0% 100%; /* text-white */
+  --success: 158 100% 41%; /* #00D18A - Màu text thành công */
+  --success-foreground: 0 0% 100%; /* text-white */
+  --warning: 35 100% 55%; /* #FF9E17 - Màu text cảnh báo */
+  --warning-foreground: 0 0% 100%; /* text-white */
+  --info: 19 98.2% 55.3%; /* #FD651D - Màu text thông tin */
+  --info-foreground: 0 0% 100%; /* text-white */
+  --disabled: 220 6% 66%; /* #A1A4B0 - Màu text bị disable */
+  --disabled-foreground: 0 0% 100%; /* text-white */
+  --placeholder: 223 9% 59%; /* #8B90A0 - Màu text placeholder */
+  --link: 19 98.2% 55.3%; /* #FD651D - Màu text link */
+  --link-hover: 19 98.2% 55.3% / 80%; /* #FD651D với opacity 80% */
+  --ring: 19 98.2% 55.3%; /* #FD651D */
+
   /* Sidebar Colors - Tint Light */
   --sidebar-background: 190 30% 97%;
-  --sidebar-foreground: 222.2 84% 4.9%;
+  --sidebar-foreground: 230 16% 17%; /* #232735 - Màu text chính */
+  --sidebar-primary: 19 98.2% 55.3%; /* #FD651D */
   --sidebar-accent: 190 30% 92%;
   --sidebar-accent-foreground: 190 70% 30%;
 }
 
 .dark.theme-tint {
-  --background: 222.2 84% 4.9%;
+  --background: 215 25% 5%; /* bg-slate-900 */
+  --foreground: 210 40% 98%; /* text-slate-100 */
   --card: 190 30% 10%;
-  --secondary: 174 97% 44%;
+  --card-foreground: 210 40% 98%; /* text-slate-100 */
+  --popover: 215 25% 5%; /* bg-slate-900 */
+  --popover-foreground: 210 40% 98%; /* text-slate-100 */
+  --primary: 19 98.2% 55.3%; /* #FD651D */
+  --primary-foreground: 0 0% 100%; /* text-white */
+  --secondary: 174 97% 44%; /* #03DAC6 */
+  --secondary-foreground: 0 0% 0%; /* text-black */
+  --muted: 215 20% 17%; /* bg-slate-800 */
+  --muted-foreground: 226 9% 50%; /* #73798D - Màu text phụ */
   --accent: 190 30% 15%;
-  --ring: var(--oxii-primary);
-  
+  --accent-foreground: 210 40% 98%; /* text-slate-100 */
+  --destructive: 350 100% 35%; /* #B00020 - Màu text lỗi */
+  --destructive-foreground: 0 0% 100%; /* text-white */
+  --success: 158 100% 41%; /* #00D18A - Màu text thành công */
+  --success-foreground: 0 0% 100%; /* text-white */
+  --warning: 35 100% 55%; /* #FF9E17 - Màu text cảnh báo */
+  --warning-foreground: 0 0% 100%; /* text-white */
+  --info: 19 98.2% 55.3%; /* #FD651D - Màu text thông tin */
+  --info-foreground: 0 0% 100%; /* text-white */
+  --disabled: 220 6% 66%; /* #A1A4B0 - Màu text bị disable */
+  --disabled-foreground: 0 0% 100%; /* text-white */
+  --placeholder: 223 9% 59%; /* #8B90A0 - Màu text placeholder */
+  --link: 19 98.2% 55.3%; /* #FD651D - Màu text link */
+  --link-hover: 19 98.2% 55.3% / 80%; /* #FD651D với opacity 80% */
+  --ring: 19 98.2% 55.3%; /* #FD651D */
+
   /* Sidebar Colors - Tint Dark */
   --sidebar-background: 190 30% 8%;
-  --sidebar-foreground: 210 40% 98%;
+  --sidebar-foreground: 210 40% 98%; /* text-slate-100 */
+  --sidebar-primary: 19 98.2% 55.3%; /* #FD651D */
   --sidebar-accent: 190 30% 15%;
-  --sidebar-accent-foreground: 210 40% 98%;
+  --sidebar-accent-foreground: 210 40% 98%; /* text-slate-100 */
 }
 
 @layer base {
@@ -289,35 +401,88 @@
     @apply font-sans antialiased bg-background text-foreground transition-colors duration-300 overflow-x-hidden;
   }
   
+  /* Style chuẩn cho các thành phần nhập liệu */
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    @apply bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 border-slate-300 dark:border-slate-700 focus:outline-none focus:border-slate-500 dark:focus:border-slate-500;
+  }
+  
+  /* Đảm bảo login page luôn ở light mode */
+  .light-mode-login {
+    @apply bg-slate-50 text-slate-900;
+  }
+  
+  /* Ghi đè các màu dark mode khi trong login page */
+  .dark .light-mode-login {
+    @apply bg-slate-50 text-slate-900;
+  }
+  
+  .dark .light-mode-login * {
+    --background: 0 0% 100%;
+    --foreground: 215 25% 27%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 27%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 27%;
+    --primary: 19 98.2% 55.3%;
+    --primary-foreground: 0 0% 100%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 215 25% 27%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 215 20.2% 65.1%;
+    color-scheme: light;
+  }
+  
+  /* Đảm bảo input, select, textarea trong login page luôn ở light mode */
+  .light-mode-login input,
+  .light-mode-login select,
+  .light-mode-login textarea {
+    @apply bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-slate-500 !important;
+  }
+  
+  .dark .light-mode-login input,
+  .dark .light-mode-login select,
+  .dark .light-mode-login textarea {
+    @apply bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-slate-500 !important;
+  }
+
   /* Fix for horizontal scrolling issues */
   .overflow-x-hidden {
     overflow-x: hidden !important;
   }
-  
+
   /* Make tables horizontally scrollable without breaking layout */
   table {
     max-width: 100%;
     display: block;
     overflow-x: auto;
   }
-  
+
   /* Animation for QR code scanning */
   @keyframes qrScanLine {
     0% {
       top: 0%;
     }
+
     50% {
       top: 100%;
     }
+
     100% {
       top: 0%;
     }
   }
-  
+
   .animate-qrScanLine {
     animation: qrScanLine 2s linear infinite;
   }
-  
+
   /* Material Design style animations */
   @keyframes ripple {
     to {
@@ -325,38 +490,38 @@
       opacity: 0;
     }
   }
-  
+
   /* Material Design inputs */
   .oxii-input-animated {
     @apply relative transition-all duration-300;
   }
-  
+
   .oxii-input-animated label {
     @apply absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none transition-all duration-200;
   }
-  
-  .oxii-input-animated input:focus ~ label,
-  .oxii-input-animated input:not(:placeholder-shown) ~ label {
+
+  .oxii-input-animated input:focus~label,
+  .oxii-input-animated input:not(:placeholder-shown)~label {
     @apply text-xs top-0 -translate-y-1/2 text-primary;
   }
-  
+
   /* Material Design ripple effect */
   .oxii-ripple {
     @apply relative overflow-hidden;
   }
-  
+
   .oxii-ripple::after {
     content: '';
     @apply absolute w-5 h-5 rounded-full bg-primary/20 scale-0 opacity-100 pointer-events-none;
     transform-origin: center;
     animation: ripple 0.6s ease-out;
   }
-  
+
   /* Material Design cards */
   .oxii-card-hover {
     @apply transition-all duration-300 hover:shadow-lg;
   }
-  
+
   /* Material Design smooth transitions */
   .oxii-transition {
     @apply transition-all duration-300 ease-in-out;
@@ -367,25 +532,150 @@
   .clip-path-hexagon {
     clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
   }
-  
+
   /* Material Design elevation levels */
   .elevation-1 {
-    box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
   }
-  
+
   .elevation-2 {
-    box-shadow: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.16), 0 3px 6px rgba(0, 0, 0, 0.23);
   }
-  
+
   .elevation-3 {
-    box-shadow: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.19), 0 6px 6px rgba(0, 0, 0, 0.23);
   }
-  
+
   .elevation-4 {
-    box-shadow: 0 14px 28px rgba(0,0,0,0.25), 0 10px 10px rgba(0,0,0,0.22);
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.25), 0 10px 10px rgba(0, 0, 0, 0.22);
+  }
+
+  .elevation-5 {
+    box-shadow: 0 19px 38px rgba(0, 0, 0, 0.30), 0 15px 12px rgba(0, 0, 0, 0.22);
+  }
+
+  /* Với phần tử bất kỳ */
+  .none-scroll {
+    overflow: auto;
+    scrollbar-width: none;
+    /* Firefox */
+    -ms-overflow-style: none;
+    /* IE 10+ */
+  }
+
+  .none-scroll::-webkit-scrollbar {
+    display: none;
+    /* Chrome, Safari */
   }
   
-  .elevation-5 {
-    box-shadow: 0 19px 38px rgba(0,0,0,0.30), 0 15px 12px rgba(0,0,0,0.22);
+  /* Đảm bảo sidebar luôn ở chế độ tối - cho cả mobile và desktop */
+  [data-sidebar="sidebar"],
+  [data-sidebar="sidebar"] * {
+    --background: 215 25% 5%; /* bg-slate-900 */
+    --foreground: 210 40% 98%; /* text-slate-100 */
+    --sidebar-background: 215 25% 5%; /* bg-slate-900 */
+    --sidebar-foreground: 210 40% 98%; /* text-slate-100 */
+    --sidebar-primary: 19 98.2% 55.3%; /* #FD651D - primary color */
+    --sidebar-accent: 215 20% 17%; /* bg-slate-800 */
+    --sidebar-border: 215 20% 30%; /* border-slate-700 */
+    --sidebar-ring: 19 98.2% 55.3%; /* #FD651D - primary color */
+    --ring: 215 20.2% 25.1%; /* dark ring */
+    color-scheme: dark;
+  }
+  
+  /* Đảm bảo tất cả các phần tử trong sidebar luôn có giao diện dark */
+  body:not(.dark) [data-sidebar="sidebar"],
+  body:not(.dark) [data-sidebar-dark="true"],
+  body:not(.dark) [data-sidebar="sidebar"] *,
+  body:not(.dark) [data-sidebar-dark="true"] * {
+    @apply bg-slate-900 text-slate-400;
+  }
+  
+  /* Menu buttons - đảm bảo nút có background trong suốt và chỉ thay đổi màu khi hover */
+  body:not(.dark) [data-sidebar="menu-button"],
+  body:not(.dark) [data-sidebar="menu-sub-button"] {
+    @apply bg-transparent text-slate-400 hover:bg-slate-800 hover:text-white;
+  }
+  
+  /* Đảm bảo input field trong sidebar có background màu khác */
+  body:not(.dark) [data-sidebar="sidebar"] input,
+  [data-sidebar="sidebar"] input {
+    @apply bg-slate-800 border-slate-700 text-slate-200 placeholder-slate-400 focus:border-slate-600 !important;
+  }
+  
+  /* Select và các control khác trong sidebar */
+  body:not(.dark) [data-sidebar="sidebar"] select,
+  body:not(.dark) [data-sidebar="sidebar"] textarea,
+  [data-sidebar="sidebar"] select,
+  [data-sidebar="sidebar"] textarea {
+    @apply bg-slate-800 border-slate-700 text-slate-200 placeholder-slate-400 focus:border-slate-600 !important;
+  }
+  
+  /* Checkbox, radio, và các control khác */
+  body:not(.dark) [data-sidebar="sidebar"] [type="checkbox"],
+  body:not(.dark) [data-sidebar="sidebar"] [type="radio"],
+  [data-sidebar="sidebar"] [type="checkbox"],
+  [data-sidebar="sidebar"] [type="radio"] {
+    @apply bg-slate-800 border-slate-700 text-orange-500 !important;
+  }
+  
+  /* Active menu items */
+  body:not(.dark) [data-sidebar="menu-button"][data-active="true"],
+  body:not(.dark) [data-sidebar="menu-sub-button"][data-active="true"],
+  [data-sidebar="menu-button"][data-active="true"],
+  [data-sidebar="menu-sub-button"][data-active="true"] {
+    @apply bg-slate-800 text-white font-medium;
+  }
+  
+  /* Parent menu items with active children */
+  body:not(.dark) [data-sidebar="menu-button"][data-has-active-child="true"],
+  [data-sidebar="menu-button"][data-has-active-child="true"] {
+    @apply bg-slate-800/50 text-white font-medium;
+  }
+  
+  /* Borders and separators */
+  body:not(.dark) [data-sidebar="menu-sub"],
+  [data-sidebar="menu-sub"] {
+    @apply border-slate-700;
+  }
+  
+  body:not(.dark) [data-sidebar="separator"],
+  [data-sidebar="separator"] {
+    @apply bg-slate-700;
+  }
+  
+  /* Search box và các control khác trong sidebar */
+  body:not(.dark) [data-sidebar="input"],
+  [data-sidebar="input"] {
+    @apply bg-slate-800 text-slate-200 border-slate-700 focus:border-slate-600;
+  }
+  
+  /* Override cho div với thuộc tính data-component-name="div" */
+  div[data-component-name="div"].bg-slate-50 {
+    @apply bg-white;
+  }
+  
+  .dark div[data-component-name="div"].dark\:bg-slate-950 {
+    @apply bg-slate-900;
+  }
+  
+  /* CSS cho datepicker để match với input text style */
+  .rdp {
+    @apply text-sm;
+  }
+  
+  .rdp-button:hover:not([disabled]):not(.rdp-day_selected) {
+    @apply bg-slate-100 dark:bg-slate-800;
+  }
+  
+  .rdp-day_selected {
+    @apply bg-primary text-white;
+  }
+  
+  /* Responsive form container */
+  @media (max-width: 1023px) {
+    .form-container {
+      @apply w-full px-4;
+    }
   }
 }

@@ -1,7 +1,7 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
-import { PanelLeft } from "lucide-react"
+import { Menu, PanelLeft, X } from "lucide-react"
 
 import { useIsMobile, useScreenSize } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
@@ -210,7 +210,13 @@ const Sidebar = React.forwardRef<
           <SheetContent
             data-sidebar="sidebar"
             data-mobile="true"
-            className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+            data-sidebar-dark="true"
+            className={cn(
+              "w-[--sidebar-width] p-0 text-gray-400",
+              "bg-slate-900 border-slate-700",
+              "border-r-0 dark", // Force dark mode for mobile sidebar
+              "[&_button[aria-label='Close']]:hidden" // Hide default SheetContent close button
+            )}
             style={
               {
                 "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
@@ -218,7 +224,7 @@ const Sidebar = React.forwardRef<
             }
             side={side}
           >
-            <div className="flex h-full w-full flex-col">{children}</div>
+            <div className="flex h-full w-full flex-col bg-slate-900 text-gray-400 dark">{children}</div>
           </SheetContent>
         </Sheet>
       )
@@ -260,7 +266,8 @@ const Sidebar = React.forwardRef<
         >
           <div
             data-sidebar="sidebar"
-            className="flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow"
+            data-sidebar-dark="true"
+            className="flex h-full w-full flex-col bg-slate-900 group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-slate-700 group-data-[variant=floating]:shadow"
           >
             {children}
           </div>
@@ -275,10 +282,10 @@ const SidebarTrigger = React.forwardRef<
   React.ElementRef<typeof Button>,
   React.ComponentProps<typeof Button>
 >(({ className, onClick, ...props }, ref) => {
-  const { toggleSidebar } = useSidebar()
-
+  const { toggleSidebar, isMobile, openMobile } = useSidebar()
+  
   return (
-    <Button
+    !openMobile && isMobile && <Button
       ref={ref}
       data-sidebar="trigger"
       variant="ghost"
@@ -290,12 +297,23 @@ const SidebarTrigger = React.forwardRef<
       }}
       {...props}
     >
-      <PanelLeft />
+      <Menu className="h-5 w-5" />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   )
 })
 SidebarTrigger.displayName = "SidebarTrigger"
+
+
+
+const SidebarTriggerClose = React.forwardRef<
+  React.ElementRef<typeof Button>,
+  React.ComponentProps<typeof Button>
+>(({ className, onClick, ...props }, ref) => {
+  // Không hiển thị nút close ở mobile vì đã ẩn nút close mặc định của SheetContent
+  return null;
+})
+SidebarTriggerClose.displayName = "SidebarTriggerClose"
 
 const SidebarRail = React.forwardRef<
   HTMLButtonElement,
@@ -476,13 +494,13 @@ const SidebarMenuItem = React.forwardRef<
 SidebarMenuItem.displayName = "SidebarMenuItem"
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button flex w-full items-center gap-2 rounded-md p-2 text-left text-sm outline-none ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[state=open]:hover:bg-sidebar-accent data-[state=open]:hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:!size-8 group-data-[collapsible=icon]:!p-2 [&>svg]:size-4 [&>svg]:shrink-0 whitespace-normal break-words",
+  "peer/menu-button flex w-full items-center gap-2 rounded-md p-2 text-left text-sm outline-none ring-sidebar-ring transition-[width,height,padding] hover:bg-slate-800 hover:text-white focus-visible:ring-2 active:bg-orange-900 active:text-orange-500 disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-orange-900 data-[active=true]:font-medium data-[active=true]:text-orange-500 data-[state=open]:hover:bg-slate-800 data-[state=open]:hover:text-white group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-2 [&>svg]:size-4 [&>svg]:shrink-0 whitespace-normal break-words text-gray-400",
   {
     variants: {
       variant: {
-        default: "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        default: "hover:bg-slate-800 hover:text-white",
         outline:
-          "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
+          "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-slate-800 hover:text-white hover:shadow-[0_0_0_1px_theme(colors.slate.800)]",
       },
       size: {
         default: "min-h-8 text-sm py-1.5",
@@ -654,7 +672,7 @@ const SidebarMenuSub = React.forwardRef<
     ref={ref}
     data-sidebar="menu-sub"
     className={cn(
-      "mx-3.5 flex min-w-0 w-full translate-x-px flex-col gap-1 border-l border-sidebar-border px-2.5 py-0.5",
+      "mx-3.5 flex min-w-0 w-full translate-x-px flex-col gap-1 border-l border-slate-700 px-2.5 py-0.5",
       "group-data-[collapsible=icon]:hidden",
       className
     )}
@@ -686,8 +704,8 @@ const SidebarMenuSubButton = React.forwardRef<
       data-size={size}
       data-active={isActive}
       className={cn(
-        "flex min-h-7 w-full -translate-x-px items-center gap-2 rounded-md px-2 py-1.5 text-sidebar-foreground outline-none ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-accent-foreground",
-        "data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground",
+        "flex min-h-7 w-full -translate-x-px items-center gap-2 rounded-md px-2 py-1.5 text-gray-400 outline-none ring-sidebar-ring hover:bg-slate-800 hover:text-white focus-visible:ring-2 active:bg-orange-900 active:text-orange-500 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>svg]:size-4 [&>svg]:shrink-0",
+        "data-[active=true]:bg-orange-900 data-[active=true]:text-orange-500 data-[active=true]:font-medium",
         "whitespace-normal break-words hyphens-auto",
         size === "sm" && "text-xs min-h-6 py-1",
         size === "md" && "text-sm",
@@ -708,7 +726,7 @@ const SidebarSeparator = React.forwardRef<
     <Separator
       ref={ref}
       data-sidebar="separator"
-      className={cn("mx-2 w-auto bg-sidebar-border", className)}
+      className={cn("mx-2 w-auto bg-slate-700", className)}
       {...props}
     />
   )
@@ -785,5 +803,6 @@ export {
   SidebarRail,
   SidebarSeparator,
   SidebarTrigger,
+  SidebarTriggerClose,
   useSidebar,
 }

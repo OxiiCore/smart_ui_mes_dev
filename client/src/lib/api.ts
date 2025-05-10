@@ -1,34 +1,42 @@
-import { 
-  GraphQLResponse, 
-  FormsListResponse, 
-  FormDetailsResponse, 
+import {
+  GraphQLResponse,
+  FormsListResponse,
+  FormDetailsResponse,
   FormSubmission,
   MenusResponse,
   MenusWithChildrenResponse,
   WorkflowResponse,
   SubmissionFormsResponse,
   DEFAULT_ORGANIZATION_ID,
-  DEFAULT_USER_ID
-} from './types';
+  DEFAULT_USER_ID,
+} from "./types";
+import { getAuthTokens, clearAuthTokens } from "./auth";
 
 // Dựa vào kiểm tra schema, backend đã hoạt động và có các trường cần thiết
-const GRAPHQL_ENDPOINT = 'https://delicate-herring-66.hasura.app/v1/graphql';
-// Sử dụng token xác thực
-const AUTH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mbyI6eyJ1c2VyVHlwZSI6IlNZU1RFTV9VU0VSIiwidXNlcklkIjoiOTViZDhhMTMtOTE0Zi00ZDAyLTg3ZTMtMGMyNjIyYjg4MmFlIiwic2VydmljZUlkIjoiZTQ2NDU5YzItZTkxMy00MGMxLTgzODMtOGY5YmYzZTdhZGEwIiwib3JnYW5pemF0aW9uSWQiOiJhOWU5ODczNC1lNWQyLTQ4NTEtODRmMy01ZjFjOWE5Y2QyYTciLCJidXNpbmVzc1JvbGVJZHMiOlsiYzk0MGU2MjgtNmFmZC00MzRhLTgwZjMtZGJkNjdiN2ZiNGEyIl19LCJpYXQiOjE3NDMzOTg2OTAsImV4cCI6MjA1ODc1ODY5MH0.RYMF__ddVq4T6CWCNfM6sD0LHr_OpvVvJgoKW5zAhgQ';
-console.log('Using GraphQL endpoint:', GRAPHQL_ENDPOINT);
+const GRAPHQL_ENDPOINT = import.meta.env.VITE_API_URL || "https://oxii-hasura-api.oxiiuat.com/v1/graphql";
+// const GRAPHQL_ENDPOINT = "https://delicate-herring-66.hasura.app/v1/graphql";
+// Token mặc định sẽ được sử dụng khi không có token trong localStorage
+const DEFAULT_AUTH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mbyI6eyJ1c2VyVHlwZSI6IlNZU1RFTV9VU0VSIiwidXNlcklkIjoiOTViZDhhMTMtOTE0Zi00ZDAyLTg3ZTMtMGMyNjIyYjg4MmFlIiwic2VydmljZUlkIjoiZTQ2NDU5YzItZTkxMy00MGMxLTgzODMtOGY5YmYzZTdhZGEwIiwib3JnYW5pemF0aW9uSWQiOiJhOWU5ODczNC1lNWQyLTQ4NTEtODRmMy01ZjFjOWE5Y2QyYTciLCJidXNpbmVzc1JvbGVJZHMiOlsiYzk0MGU2MjgtNmFmZC00MzRhLTgwZjMtZGJkNjdiN2ZiNGEyIl19LCJpYXQiOjE3NDMzOTg2OTAsImV4cCI6MjA1ODc1ODY5MH0.RYMF__ddVq4T6CWCNfM6sD0LHr_OpvVvJgoKW5zAhgQ';
 
 /**
  * Execute a GraphQL query
  */
-export async function executeGraphQLQuery<T>(query: string, variables?: Record<string, any>): Promise<T> {
+export async function executeGraphQLQuery<T>(
+  query: string,
+  variables?: Record<string, any>,
+): Promise<T> {
   try {
-    console.log('Executing GraphQL query with variables:', variables);
+    console.log("Executing GraphQL query with variables:", variables);
+    
+    // Lấy token từ local storage qua Auth service
+    const authTokens = getAuthTokens();
+    const accessToken = authTokens?.accessToken || DEFAULT_AUTH_TOKEN;
     
     const response = await fetch(GRAPHQL_ENDPOINT, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${AUTH_TOKEN}` // Thêm header xác thực
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`, // Sử dụng accessToken từ local storage
       },
       body: JSON.stringify({
         query,
@@ -36,23 +44,72 @@ export async function executeGraphQLQuery<T>(query: string, variables?: Record<s
       }),
     });
 
+    // Nếu status code là 401 (Unauthorized), xóa thông tin xác thực và chuyển hướng về trang login
+    if (response.status === 401) {
+      console.error("Authentication failed (401 Unauthorized). Logging out...");
+      clearAuthTokens(); // Xóa token khỏi localStorage
+      
+      // Chuyển hướng đến trang đăng nhập
+      window.location.href = '/login';
+      throw new Error("Authentication token expired or invalid. Please login again.");
+    }
+
     if (!response.ok) {
       throw new Error(`GraphQL request failed: ${response.statusText}`);
     }
 
     const result = await response.json();
-    console.log('GraphQL result:', result);
+    console.log("GraphQL result:", result);
 
     if (result.errors) {
-      console.error('GraphQL errors:', result.errors);
-      throw new Error(result.errors.map((e: any) => e.message).join('\n'));
+      console.error("GraphQL errors:", result.errors);
+      
+      // Kiểm tra nếu lỗi liên quan đến xác thực thì cũng xử lý tương tự như 401
+      const authErrors = result.errors.some((e: any) => 
+        e.message.toLowerCase().includes('jwt') || 
+        e.message.toLowerCase().includes('token') || 
+        e.message.toLowerCase().includes('unauthorized')
+      );
+      
+      if (authErrors) {
+        console.error("Authentication failed (JWT/token error). Logging out...");
+        clearAuthTokens(); // Xóa token khỏi localStorage
+        window.location.href = '/login';
+        throw new Error("Authentication token expired or invalid. Please login again.");
+      }
+      
+      throw new Error(result.errors.map((e: any) => e.message).join("\n"));
     }
 
     return result as T;
   } catch (error) {
-    console.error('GraphQL query error:', error);
+    console.error("GraphQL query error:", error);
     throw error;
   }
+}
+
+/**
+ * Fetch options for SEARCH field type
+ */
+export async function fetchSearchOptions(
+  optionId: string,
+): Promise<GraphQLResponse<any>> {
+  const query = `
+    query getAllOptions($optionId: uuid!) {
+      core_core_option_items(
+        where: { deleted_at: { _is_null: true }, option_id: { _eq: $optionId } }
+        order_by: { created_at: desc }
+      ) {
+        id
+        code
+        name
+        parent_id
+      }
+    }
+  `;
+
+  console.log("Fetching search options for option ID:", optionId);
+  return executeGraphQLQuery(query, { optionId });
 }
 
 /**
@@ -85,12 +142,12 @@ export async function createField(field: {
  * Cập nhật thông tin trường (field)
  */
 export async function updateField(
-  fieldId: string, 
+  fieldId: string,
   updates: {
     name?: string;
     description?: string;
     status?: string;
-  }
+  },
 ): Promise<GraphQLResponse<any>> {
   const query = `
     mutation UpdateField($fieldId: uuid!, $updates: core_core_dynamic_fields_set_input!) {
@@ -114,7 +171,9 @@ export async function updateField(
 /**
  * Xóa một trường (field) khỏi một form cụ thể
  */
-export async function removeFieldFromForm(formFieldId: string): Promise<GraphQLResponse<any>> {
+export async function removeFieldFromForm(
+  formFieldId: string,
+): Promise<GraphQLResponse<any>> {
   const query = `
     mutation RemoveFieldFromForm($formFieldId: uuid!) {
       delete_core_core_dynamic_form_fields_by_pk(id: $formFieldId) {
@@ -131,7 +190,9 @@ export async function removeFieldFromForm(formFieldId: string): Promise<GraphQLR
 /**
  * Đọc thông tin chi tiết của một trường (field)
  */
-export async function fetchFieldDetails(fieldId: string): Promise<GraphQLResponse<any>> {
+export async function fetchFieldDetails(
+  fieldId: string,
+): Promise<GraphQLResponse<any>> {
   const query = `
     query GetFieldDetails($fieldId: uuid!) {
       core_core_dynamic_fields_by_pk(id: $fieldId) {
@@ -154,23 +215,41 @@ export async function fetchFieldDetails(fieldId: string): Promise<GraphQLRespons
  * Fetch all forms - Deprecated, use fetchMenuForms instead
  * This function is now disabled as per user request
  */
-export async function fetchForms(limit = 20, offset = 0): Promise<GraphQLResponse<FormsListResponse>> {
-  console.warn('fetchForms is deprecated and disabled. Use fetchMenuForms instead.');
+export async function fetchForms(
+  limit = 20,
+  offset = 0,
+): Promise<GraphQLResponse<FormsListResponse>> {
+  console.warn(
+    "fetchForms is deprecated and disabled. Use fetchMenuForms instead.",
+  );
   return Promise.resolve({
     data: {
-      core_core_dynamic_forms: []
-    }
+      core_core_dynamic_forms: [],
+    },
   } as GraphQLResponse<FormsListResponse>);
 }
 
 /**
  * Fetch forms by menu ID and form type (CREATE/EDIT/VIEW)
  */
-export async function fetchMenuForms(menuId: string, formType: 'CREATE' | 'EDIT' | 'VIEW'): Promise<GraphQLResponse<any>> {
+export async function fetchMenuForms(
+  menuId: string,
+  formType: "CREATE" | "EDIT" | "VIEW",
+): Promise<GraphQLResponse<any>> {
   // Sử dụng đúng tên field theo query mẫu bạn cung cấp
   const query = `
     query GetFormsByMenu($menuId: uuid!, $formType: String!) {
-      core_core_dynamic_menu_forms(where: {menu_id: {_eq: $menuId}, form_type: {_eq: $formType}, deleted_at: {_is_null: true}}) {
+      core_core_dynamic_menu_forms(where: {
+        menu_id: {_eq: $menuId}, 
+        form_type: {_eq: $formType},
+        deleted_at: {_is_null: true},
+        core_dynamic_form: {
+          deleted_at: { _is_null: true },
+          core_dynamic_form_fields: {
+            core_dynamic_field: { deleted_at: { _is_null: true } }
+          }
+        }
+      }) {
         id
         form_type
         form_id
@@ -183,6 +262,7 @@ export async function fetchMenuForms(menuId: string, formType: 'CREATE' | 'EDIT'
             id
             is_required
             position
+            option_id
             core_dynamic_field {
               id
               code
@@ -202,7 +282,7 @@ export async function fetchMenuForms(menuId: string, formType: 'CREATE' | 'EDIT'
   // Chỉ sử dụng các tham số cần thiết theo yêu cầu
   const variables = {
     menuId,
-    formType
+    formType,
   };
 
   console.log("Fetching menu forms with:", variables);
@@ -212,7 +292,9 @@ export async function fetchMenuForms(menuId: string, formType: 'CREATE' | 'EDIT'
 /**
  * Fetch form fields by form ID
  */
-export async function fetchFormFields(formId: string): Promise<GraphQLResponse<FormDetailsResponse>> {
+export async function fetchFormFields(
+  formId: string,
+): Promise<GraphQLResponse<FormDetailsResponse>> {
   // Sử dụng đúng format truy vấn GraphQL từ mẫu được cung cấp
   const query = `
     query FormDetail($id: uuid!) {
@@ -244,63 +326,82 @@ export async function fetchFormFields(formId: string): Promise<GraphQLResponse<F
   `;
 
   console.log("Fetching form details with ID:", formId);
-  return executeGraphQLQuery<GraphQLResponse<FormDetailsResponse>>(query, { id: formId });
+  return executeGraphQLQuery<GraphQLResponse<FormDetailsResponse>>(query, {
+    id: formId,
+  });
 }
 
 /**
  * Submit form data using GraphQL mutation
  */
-export async function submitFormData(submission: FormSubmission & { workflowId?: string, menuId?: string, formId?: string }): Promise<GraphQLResponse<any>> {
+export async function submitFormData(
+  submission: FormSubmission & {
+    workflowId?: string;
+    menuId?: string;
+    formId?: string;
+  },
+): Promise<GraphQLResponse<any>> {
   // Áp dụng logic cho tất cả submenu, giống như cách xử lý cho submenu khiếu nại (ID: "ss")
   const query = `
-    mutation InsertMenuRecord($menuId: String!, $userId: String!, $organizationId: String!, $title: String!, $submissionData: JSON) {
-insert_menu_record(args: {
-menu_id: $menuId,
-user_id: $userId,
-organization_id: $organizationId,
-title: $title,
-submission_data: $submissionData
-}) {
-id
-code
-menu_id
-organization_id
-user_id
-workflow_id
-data
-}
-}
-  `;
+    mutation InsertMenuRecord(
+      $menuId: String!,
+      $title: String!,
+      $submissionData: JSON
+    ) {
+      mes {
+        factoryInsertMenuRecord(
+            args: {
+                menuId: $menuId,
+                title: $title,
+                submissionData: $submissionData
+            }
+        ) {
+            id
+            code
+            menuId
+            organizationId
+            workflowId
+            data
+        }
+      }
+    }
+  `
 
   // Biến đổi dữ liệu cho phù hợp với định dạng mutation mới
-  const submissionFields = Object.entries(submission.data).map(([fieldId, fieldData]) => {
-    // fieldData giờ đây là một đối tượng có chứa value, name, và field_type
-    return {
-      id: fieldId,
-      name: fieldData.name,
-      field_type: fieldData.field_type,
-      value: fieldData.value
-    };
-  });
+  const submissionFields = Object.entries(submission.data).map(
+    ([fieldId, fieldData]) => {
+      // fieldData giờ đây là một đối tượng có chứa value, name, và field_type
+      return {
+        id: fieldId,
+        name: fieldData.name,
+        field_type: fieldData.field_type,
+        value: fieldData.value,
+      };
+    },
+  );
 
   // Tạo tiêu đề từ dữ liệu đã nhập hoặc sử dụng tiêu đề mặc định
   // Tìm field có tên hoặc field_type là TEXT để dùng làm tiêu đề
   let title = "Khiếu nại mới";
-  const titleField = Object.values(submission.data).find(field => 
-    field.name.toLowerCase().includes("tiêu đề") || 
-    field.name.toLowerCase().includes("title")
+  const titleField = Object.values(submission.data).find(
+    (field) =>
+      field.name.toLowerCase().includes("tiêu đề") ||
+      field.name.toLowerCase().includes("title"),
   );
-  
+
   if (titleField && titleField.value) {
     title = String(titleField.value);
   }
 
   // QUAN TRỌNG: Cần sử dụng ID của submenu thay vì workflowId
   // Theo yêu cầu, cần sử dụng menuId từ tham số truyền vào
-  const menuId = submission.menuId || submission.workflowId || "7ffe9691-7f9b-430d-a945-16e0d9b173c4";
-  
+  const menuId =
+    submission.menuId ||
+    submission.workflowId ||
+    "7ffe9691-7f9b-430d-a945-16e0d9b173c4";
+
   console.log("Using menuId for submission:", menuId);
-  
+
   // Nếu có formId từ tham số, sử dụng nó
   const formId = submission.formId;
 
@@ -311,10 +412,10 @@ data
   // Sử dụng các ID mặc định từ types.ts
   const variables = {
     menuId: menuId,
-    userId: DEFAULT_USER_ID, // Sử dụng hằng số từ types.ts
-    organizationId: DEFAULT_ORGANIZATION_ID, // Sử dụng hằng số từ types.ts
+    // userId: DEFAULT_USER_ID, // Sử dụng hằng số từ types.ts
+    // organizationId: localStorage.getItem('organizationId') || DEFAULT_ORGANIZATION_ID, // Sử dụng hằng số từ types.ts
     title: title,
-    submissionData: submissionFields
+    submissionData: submissionFields,
   };
 
   console.log("Submitting form with data:", variables);
@@ -324,7 +425,9 @@ data
 /**
  * Fetch main menus (parent menus)
  */
-export async function fetchMainMenus(): Promise<GraphQLResponse<MenusWithChildrenResponse>> {
+export async function fetchMainMenus(): Promise<
+  GraphQLResponse<MenusWithChildrenResponse>
+> {
   const query = `
     query GetMainMenus {
       core_core_dynamic_menus(
@@ -343,32 +446,44 @@ export async function fetchMainMenus(): Promise<GraphQLResponse<MenusWithChildre
 }
 
 /**
- * Fetch all menus 
+ * Fetch all menus
  */
 export async function fetchAllMenus(): Promise<GraphQLResponse<MenusResponse>> {
   const query = `
     query GetAllMenus {
-      core_core_dynamic_menus(where: {deleted_at: {_is_null: true}}) {
+      core_core_dynamic_menus(
+        where: {
+          deleted_at: {_is_null: true},
+        }
+      ) {
         id
         code
         name
         parent_id
         workflow_id
         description
+        status
       }
     }
   `;
 
   console.log("Fetching all menus from API...");
-  const response = await executeGraphQLQuery<GraphQLResponse<MenusResponse>>(query);
-  console.log("Successfully fetched menus:", response.data?.core_core_dynamic_menus?.length || 0, "items");
+  const response =
+    await executeGraphQLQuery<GraphQLResponse<MenusResponse>>(query);
+  console.log(
+    "Successfully fetched menus:",
+    response.data?.core_core_dynamic_menus?.length || 0,
+    "items",
+  );
   return response;
 }
 
 /**
  * Fetch workflows related to a specific menu
  */
-export async function fetchMenuWorkflows(menuId: string): Promise<GraphQLResponse<WorkflowResponse>> {
+export async function fetchMenuWorkflows(
+  menuId: string,
+): Promise<GraphQLResponse<WorkflowResponse>> {
   const query = `
     query GetWorkflowsByMenu($menuId: uuid!) {
       core_core_dynamic_workflows(
@@ -383,13 +498,17 @@ export async function fetchMenuWorkflows(menuId: string): Promise<GraphQLRespons
     }
   `;
 
-  return executeGraphQLQuery<GraphQLResponse<WorkflowResponse>>(query, { menuId });
+  return executeGraphQLQuery<GraphQLResponse<WorkflowResponse>>(query, {
+    menuId,
+  });
 }
 
 /**
  * Fetch submission forms for a specific workflow
  */
-export async function fetchSubmissionForms(workflowId: string): Promise<GraphQLResponse<SubmissionFormsResponse>> {
+export async function fetchSubmissionForms(
+  workflowId: string,
+): Promise<GraphQLResponse<SubmissionFormsResponse>> {
   const query = `
     query GetSubmissionForms($workflowId: uuid!, $organizationId: uuid!, $userId: uuid!) {
       core_core_submission_forms(where: {
@@ -405,20 +524,26 @@ export async function fetchSubmissionForms(workflowId: string): Promise<GraphQLR
       }
     }
   `;
-  
+
   const variables = {
     workflowId,
     organizationId: DEFAULT_ORGANIZATION_ID,
-    userId: DEFAULT_USER_ID
+    userId: DEFAULT_USER_ID,
   };
 
-  return executeGraphQLQuery<GraphQLResponse<SubmissionFormsResponse>>(query, variables);
+  return executeGraphQLQuery<GraphQLResponse<SubmissionFormsResponse>>(
+    query,
+    variables,
+  );
 }
 
 /**
  * Update submission form data
  */
-export async function updateSubmissionForm(submissionId: string, updatedData: any[]): Promise<GraphQLResponse<any>> {
+export async function updateSubmissionForm(
+  submissionId: string,
+  updatedData: any[],
+): Promise<GraphQLResponse<any>> {
   const query = `
     mutation UpdateMenuRecord($recordId: uuid!, $data: jsonb!) {
       update_core_core_menu_records_by_pk(
@@ -435,7 +560,7 @@ export async function updateSubmissionForm(submissionId: string, updatedData: an
 
   const variables = {
     recordId: submissionId,
-    data: updatedData
+    data: updatedData,
   };
 
   return executeGraphQLQuery(query, variables);
@@ -445,14 +570,14 @@ export async function updateSubmissionForm(submissionId: string, updatedData: an
  * Fetch menu records by menu ID
  */
 export async function fetchMenuRecords(
-  menuId: string, 
-  limit: number | null = null, 
+  menuId: string,
+  limit: number | null = null,
   offset: number | null = null,
-  recordId?: string
+  recordId?: string,
 ): Promise<GraphQLResponse<any>> {
   // Tạo câu truy vấn GraphQL với hoặc không có điều kiện recordId
   let query;
-  
+
   if (recordId) {
     // Nếu có recordId, tìm chính xác record và lọc deleted_at is null
     query = `
@@ -515,7 +640,50 @@ export async function fetchMenuRecords(
     menuId,
     limit,
     offset,
-    ...(recordId && { recordId })
+    ...(recordId && { recordId }),
+  };
+
+  return executeGraphQLQuery(query, variables);
+}
+
+/**
+ * Fetch menu records by menu ID
+ */
+export async function fetchMenuRecordLists(
+  menuId: string,
+  page: number | null = null,
+  size: number | null = null,
+  keyword?: string,
+): Promise<GraphQLResponse<any>> {
+  // Tạo câu truy vấn GraphQL với hoặc không có điều kiện recordId
+  const query = `
+    query getMenuRecordList($menuId: String!, $page: Float, $size: Float, $keyword: String) {
+      mes {
+        factoryMenuRecordList(
+            menuId: $menuId
+            filter: { page: $page, size: $size, keyword: $keyword }
+        ) {
+            total
+            count
+            data {
+                id
+                code
+                title
+                menuId
+                menu
+                statusId
+                status
+                data
+            }
+        }
+    }
+  }
+`;
+  const variables = {
+    menuId,
+    page,
+    size,
+    keyword,
   };
 
   return executeGraphQLQuery(query, variables);
@@ -526,20 +694,23 @@ export async function fetchMenuRecords(
  */
 export async function fetchWorkflowTransitionsByStatus(
   workflowId: string,
-  fromStatusId: string
+  fromStatusId: string,
 ): Promise<GraphQLResponse<any>> {
-  console.log('Calling API fetchWorkflowTransitionsByStatus with workflowId:', workflowId);
-  console.log('Menu information:', {
+  console.log(
+    "Calling API fetchWorkflowTransitionsByStatus with workflowId:",
+    workflowId,
+  );
+  console.log("Menu information:", {
     menuIdFromQuery: workflowId,
     currentSubmenuId: workflowId,
     menuIdToUse: workflowId,
-    workflowId: workflowId
+    workflowId: workflowId,
   });
-  
+
   // Xử lý 2 trường hợp cho query:
   // 1. Nếu có fromStatusId: lấy các transitions từ status này
   // 2. Nếu không có fromStatusId: lấy các transitions có from_status_id là null (trạng thái khởi tạo)
-  const query = fromStatusId 
+  const query = fromStatusId
     ? `
       query GetTransitionByStatus($workflowId: uuid!, $fromStatusId: uuid!) {
         core_core_dynamic_workflow_transitions(
@@ -579,14 +750,16 @@ export async function fetchWorkflowTransitionsByStatus(
     ? { workflowId, fromStatusId }
     : { workflowId };
 
-  console.log('Fetching transitions with variables:', variables);
+  console.log("Fetching transitions with variables:", variables);
   return executeGraphQLQuery(query, variables);
 }
 
 /**
  * Fetch form by transition ID
  */
-export async function fetchTransitionForm(transitionId: string): Promise<GraphQLResponse<any>> {
+export async function fetchTransitionForm(
+  transitionId: string,
+): Promise<GraphQLResponse<any>> {
   const query = `
     query MyQuery2($transitionId: uuid!) {
       core_core_dynamic_workflow_transitions_by_pk(id: $transitionId) {
@@ -603,6 +776,7 @@ export async function fetchTransitionForm(transitionId: string): Promise<GraphQL
             id
             is_required
             position
+            option_id
             core_dynamic_field {
               id
               code
@@ -631,7 +805,7 @@ export async function submitTransitionForm(
   recordId: string,
   userId: string = DEFAULT_USER_ID, // Sử dụng giá trị mặc định từ constants
   name: string,
-  submissionData: any[]
+  submissionData: any[],
 ): Promise<GraphQLResponse<any>> {
   const query = `
     mutation insert_submission_form($transitionId: String!, $recordId: String!, $userId: String!, $name: String!, $submissionData: JSON) {
@@ -656,9 +830,9 @@ export async function submitTransitionForm(
     recordId,
     userId,
     name,
-    submissionData
+    submissionData,
   };
-  
+
   console.log("Submitting transition form with data:", variables);
   return executeGraphQLQuery(query, variables);
 }
@@ -666,11 +840,23 @@ export async function submitTransitionForm(
 /**
  * Fetch menu view form fields for column headers
  */
-export async function fetchMenuViewForm(menuId: string): Promise<GraphQLResponse<any>> {
+export async function fetchMenuViewForm(
+  menuId: string,
+): Promise<GraphQLResponse<any>> {
   const query = `
     query FetchMenuViewForm($menuId: uuid!) {
       core_core_dynamic_menu_forms(
-        where: {menu_id: {_eq: $menuId}, form_type: {_eq: "VIEW"}, deleted_at: {_is_null: true}}
+        where: {
+          menu_id: {_eq: $menuId}, 
+          form_type: {_eq: "VIEW"}, 
+          deleted_at: {_is_null: true},
+          core_dynamic_form: {
+            deleted_at: { _is_null: true },
+            core_dynamic_form_fields: {
+              core_dynamic_field: { deleted_at: { _is_null: true } }
+            }
+          }
+        }
       ) {
         id
         form_type
@@ -684,6 +870,7 @@ export async function fetchMenuViewForm(menuId: string): Promise<GraphQLResponse
             id
             is_required
             position
+            option_id
             core_dynamic_field {
               id
               code
@@ -701,7 +888,7 @@ export async function fetchMenuViewForm(menuId: string): Promise<GraphQLResponse
   `;
 
   const variables = {
-    menuId
+    menuId,
   };
 
   return executeGraphQLQuery(query, variables);
@@ -717,9 +904,9 @@ export async function apiRequest(
 ): Promise<Response> {
   const res = await fetch(url, {
     method,
-    headers: data ? { 'Content-Type': 'application/json' } : {},
+    headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
-    credentials: 'include',
+    credentials: "include",
   });
 
   if (!res.ok) {
@@ -728,4 +915,60 @@ export async function apiRequest(
   }
 
   return res;
+}
+
+/**
+ * Lấy các form của workflow từ API (bao gồm cả form fields)
+ * Sử dụng cùng cách query như trong AddSubmissionDialog - thông qua menuId
+ */
+export async function fetchFormsByWorkflow(workflowId: string): Promise<GraphQLResponse<any>> {
+  // Tìm menuId từ workflowId
+  const findMenuIdFromWorkflow = async (wfId: string) => {
+    try {
+      const allMenusResponse = await fetchAllMenus();
+      const allMenus = allMenusResponse.data.core_core_dynamic_menus;
+      
+      // Tìm menu với workflow_id trùng khớp
+      const currentMenu = allMenus.find((menu: any) => menu.workflow_id === wfId);
+      
+      if (currentMenu) {
+        console.log("Found menu for workflow:", currentMenu.id);
+        return currentMenu.id;
+      }
+      
+      // Mặc định nếu không tìm thấy (có thể thay đổi tùy context)
+      console.log("Menu not found for workflow ID:", wfId);
+      return null;
+    } catch (err) {
+      console.error("Error finding menu by workflow:", err);
+      return null;
+    }
+  };
+
+  // Lấy menuId dựa trên workflowId 
+  const menuId = await findMenuIdFromWorkflow(workflowId);
+  
+  if (!menuId) {
+    console.error("No menu found for workflow:", workflowId);
+    return { data: { core_core_dynamic_forms: [] } };
+  }
+  
+  // Sử dụng fetchMenuForms để lấy form với loại CREATE
+  const response = await fetchMenuForms(menuId, 'CREATE');
+  
+  // Chuyển đổi từ định dạng menu forms sang định dạng forms để tương thích
+  if (response.data && response.data.core_core_dynamic_menu_forms) {
+    const forms = response.data.core_core_dynamic_menu_forms.map((menuForm: any) => ({
+      id: menuForm.core_dynamic_form.id,
+      name: menuForm.core_dynamic_form.name,
+      description: menuForm.core_dynamic_form.description || '',
+      status: 'ACTIVE',
+      __typename: 'core_core_dynamic_forms',
+      core_dynamic_form_fields: menuForm.core_dynamic_form.core_dynamic_form_fields
+    }));
+    
+    return { data: { core_core_dynamic_forms: forms } };
+  }
+  
+  return { data: { core_core_dynamic_forms: [] } };
 }
